@@ -3,7 +3,7 @@
 ## 环境要求
 
 - Windows PowerShell。
-- Node.js 与 npm。当前项目已在本机 Node.js 24 环境验证；依赖版本以两个 `package-lock.json` 为准。
+- Node.js 20 或更高版本，并确保 `node`、`npm` 已加入 PATH；依赖版本以两个 `package-lock.json` 为准。
 - 如需执行规范校验，安装可用的 `openspec` CLI。
 - Codex MCP PiP 走查需要支持本地插件和 MCP UI 的 Codex 宿主。
 
@@ -16,23 +16,19 @@
 
 ## 安装依赖
 
-首次检出后分别安装锁定依赖：
+以下命令均从仓库根目录执行。首次检出后分别安装锁定依赖：
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm install
-
-Set-Location ..\ui
-npm install
+npm --prefix plugins/plantree/server ci
+npm --prefix plugins/plantree/ui ci
 ```
 
-正式、可复现安装环境可使用 `npm ci` 替代 `npm install`；不要删除或手工合并两个锁文件。
+主动更新依赖时可使用 `npm install`；普通使用和复现构建优先使用 `npm ci`。不要删除或手工合并两个锁文件。
 
 ## 本地 Web 开发
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree
-npm run web
+npm --prefix plugins/plantree run web
 ```
 
 `scripts/start-web.mjs` 按以下顺序工作：
@@ -47,8 +43,7 @@ Vite 使用 `strictPort: true`，端口占用时启动失败，不会自动改�
 ## Codex MCP 构建
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm run build
+npm --prefix plugins/plantree/server run build
 ```
 
 服务端 `prebuild` 会运行 UI 的 `build:mcp`：
@@ -57,15 +52,23 @@ npm run build
 2. `ui/scripts/embed-mcp-app.mjs` 将资源嵌入服务端可用模块。
 3. TypeScript 将服务端源码编译到 `server/dist`。
 
-`.mcp.json` 使用绝对 Node.js 可执行文件路径和 `${PLUGIN_ROOT}/server/dist/index.js`。在其他 Windows 机器交接时，首先核对 `command` 是否指向实际 Node.js 路径。
+`.mcp.json` 使用 PATH 中的 `node` 和 `${PLUGIN_ROOT}/server/dist/index.js`。如果 Codex 无法找到 Node.js，先确认 `Get-Command node`，然后完全重启 Codex 以重新读取 PATH。不要将个人机器的绝对 Node.js 路径提交到仓库。
+
+首次安装仓库内的本地插件：
+
+```powershell
+codex plugin marketplace add .
+codex plugin add plantree@plantree-local
+```
+
+插件更新并重新构建后，运行 `codex plugin add plantree@plantree-local` 刷新安装，再完全重启 Codex 并新建任务。
 
 ## 集中验证策略
 
 ### 仅修改服务端领域或协议
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm test
+npm --prefix plugins/plantree/server test
 ```
 
 当前 `pretest` 会先生成 MCP UI 和服务端构建，因此该命令同时检查干净构建入口与 14 个服务端测试文件。
@@ -73,9 +76,8 @@ npm test
 ### 仅修改 UI 类型或纯函数
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\ui
-npm test
-npm run typecheck
+npm --prefix plugins/plantree/ui test
+npm --prefix plugins/plantree/ui run typecheck
 ```
 
 可在开发中定向运行单个 Vitest 文件；交付前再运行完整 UI 测试。
@@ -83,8 +85,7 @@ npm run typecheck
 ### 修改 UI 构建或 MCP 资源
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\ui
-npm run build
+npm --prefix plugins/plantree/ui run build
 ```
 
 该命令生成普通 Web 产物和 MCP 内嵌 UI 产物。
@@ -92,7 +93,6 @@ npm run build
 ### 修改 OpenSpec 范围内行为
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree
 openspec validate graph-interactive-plantree --strict
 ```
 
@@ -101,16 +101,11 @@ openspec validate graph-interactive-plantree --strict
 功能性修改交付前建议按顺序执行：
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\ui
-npm test
-npm run typecheck
-npm run build
-
-Set-Location ..\server
-npm test
-npm run build
-
-Set-Location D:\Project\Cambridge\PlanTree
+npm --prefix plugins/plantree/ui test
+npm --prefix plugins/plantree/ui run typecheck
+npm --prefix plugins/plantree/ui run build
+npm --prefix plugins/plantree/server test
+npm --prefix plugins/plantree/server run build
 openspec validate graph-interactive-plantree --strict
 ```
 

@@ -1,74 +1,114 @@
-# PlanTree
+# PlanTree 插件
 
-PlanTree 是一个本地 Node.js + TypeScript 任务树服务，同时提供 Codex MCP PiP 和本地 Web 两个入口。两个入口共享同一份任务树状态文件，所有任务树变更都由服务端执行版本检查和持久化。
+本目录包含 PlanTree 的 Codex 插件、本地 Web 启动器、Node.js + TypeScript 服务端和共享 React UI。MCP 与 Web 使用同一份本地任务树状态，所有写操作都由服务端进行版本检查。
 
-## 五分钟启动
+本文所有 PowerShell 命令都从仓库根目录执行。仓库根目录是包含 `README.md`、`plugins/` 和 `openspec/` 的目录，不要求项目位于任何固定磁盘或文件夹。
 
-首次使用时，在 PowerShell 中安装两个工作区的依赖：
+## 1. 准备环境
+
+安装 Node.js 20 或更高版本，并确保命令可用：
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm install
-
-Set-Location ..\ui
-npm install
+node --version
+npm --version
 ```
 
-启动本地 Web：
+安装依赖：
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree
-npm run web
+npm --prefix plugins/plantree/server ci
+npm --prefix plugins/plantree/ui ci
+```
+
+## 2. 使用本地 Web
+
+```powershell
+npm --prefix plugins/plantree run web
 ```
 
 统一启动器会先编译服务端，再在同一个 Node.js 进程中启动：
 
-- Web 页面：`http://127.0.0.1:5174`
-- 本地 API：`http://127.0.0.1:4174`
+- Web 页面：<http://127.0.0.1:5174>
+- 本地 API：<http://127.0.0.1:4174>
+- 任务树读取接口：<http://127.0.0.1:4174/api/plan>
 
-在启动终端按 `Ctrl+C` 同时停止两个服务。不要同时单独运行 `server` 的 Web 服务。
+在启动终端按 `Ctrl+C` 同时停止页面和 API。不要同时单独运行服务端的 `web:server`，否则可能连接到旧构建。
 
-## Codex MCP 入口
-
-MCP 配置位于 `.mcp.json`，通过本地 `stdio` 启动 `server/dist/index.js`。首次使用或修改服务端、UI 后先生成正式构建：
+## 3. 构建 Codex MCP 插件
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm run build
+npm --prefix plugins/plantree/server run build
 ```
 
-该构建命令会先生成 MCP 内嵌 UI，再编译服务端 JavaScript。Codex 插件清单位于 `.codex-plugin/plugin.json`。
+构建过程会：
 
-## 常用验证命令
+1. 构建 MCP PiP 使用的 React UI。
+2. 将 UI 资源嵌入服务端模块。
+3. 生成 `plugins/plantree/server/dist/index.js`。
 
-集中开发验证：
+`.mcp.json` 使用 PATH 中的 `node` 和 `${PLUGIN_ROOT}`，不会绑定开发者的用户名、盘符或 Node.js 安装目录。若 Codex 无法找到 `node`：
+
+1. 在 PowerShell 中确认 `Get-Command node` 有结果。
+2. 完全退出并重新打开 Codex，使其重新读取 PATH。
+3. 仍无法启动时，可在个人安装副本中将 `command` 临时改为本机 `node.exe` 的绝对路径，但不要把个人路径提交回仓库。
+
+首次安装本地插件时，在仓库根目录执行：
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm test
+codex plugin marketplace add .
+codex plugin add plantree@plantree-local
+```
 
-Set-Location ..\ui
-npm run typecheck
+`.agents/plugins/marketplace.json` 中的插件源相对指向 `plugins/plantree`。可用以下命令确认 marketplace 和插件状态：
 
-Set-Location D:\Project\Cambridge\PlanTree
+```powershell
+codex plugin marketplace list
+codex plugin list
+```
+
+拉取新版代码并重新构建后，再运行 `codex plugin add plantree@plantree-local` 刷新安装。完全重启 Codex，并在新任务中测试新的 MCP 工具和 PiP 资源。
+
+## 4. 常用验证
+
+服务端、MCP 协议和构建入口：
+
+```powershell
+npm --prefix plugins/plantree/server test
+```
+
+UI 类型检查：
+
+```powershell
+npm --prefix plugins/plantree/ui run typecheck
+```
+
+完整 UI 测试和 Web/MCP UI 构建：
+
+```powershell
+npm --prefix plugins/plantree/ui test
+npm --prefix plugins/plantree/ui run build
+```
+
+OpenSpec 严格校验：
+
+```powershell
 openspec validate graph-interactive-plantree --strict
 ```
 
-完整 UI 测试或 Web 生产构建按需运行：
+## 5. 运行数据
 
-```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\ui
-npm test
-npm run build
-```
+- `plugins/plantree/data/plantree-plan.example.json`：随仓库提交的示例。
+- `plugins/plantree/data/plantree-plan.json`：本机运行状态，已被 Git 忽略。
+- `plugins/plantree/server/dist`、`plugins/plantree/ui/dist`：可重新构建的产物，已被 Git 忽略。
 
-## 必须保持的边界
+不要用示例文件无条件覆盖其他人的运行状态，也不要提交自己的 `plantree-plan.json`。
+
+## 6. 必须保持的边界
 
 - 所有写操作必须传递当前快照的 `expectedVersion`；HTTP 冲突返回 `409` 和服务端最新快照。
-- MCP 与 Web 共用 `data/plantree-plan.json`，但撤销和重做历史只存在于各自服务进程内。
-- 图中节点拖动仅调整前端会话坐标，不得调用 `move_node`；`move_node` 是服务端的同父节点顺序编辑能力。
+- MCP 与 Web 共用状态文件，但撤销和重做历史只存在于各自服务进程内。
+- 图中节点拖动仅调整前端会话坐标，不得调用 `move_node`。
 - `childIds` 是树结构和同层顺序的权威来源，`dependsOn` 仅表示显式依赖。
-- `data/plantree-plan.example.json` 是可提交示例；`data/plantree-plan.json` 是运行时状态，不得用示例文件无条件覆盖。
 - 不改变既有 MCP 工具名、HTTP 路由、任务树 JSON 或版本冲突规则，除非先完成对应规范变更。
 
 ## 维护文档
@@ -80,4 +120,4 @@ npm run build
 - [故障排查](docs/troubleshooting.md)
 - [后端交接清单](docs/handoff-checklist.md)
 
-当前 OpenSpec 变更 `graph-interactive-plantree` 为 `25/26`；唯一未完成项是 `5.4 Codex MCP PiP` 人工走查，必须由实际宿主环境验收后再标记完成。
+当前 OpenSpec 变更 `graph-interactive-plantree` 为 `25/26`；唯一未完成项是 `5.4 Codex MCP PiP` 人工走查。

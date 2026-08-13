@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "plantree": {
-      "command": "D:\\software\\Node.js\\node.exe",
+      "command": "node",
       "args": [
         "${PLUGIN_ROOT}/server/dist/index.js"
       ]

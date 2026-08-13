@@ -5,7 +5,7 @@
 - [ ] 使用 Windows PowerShell。
 - [ ] `node --version` 与 `npm --version` 可正常执行。
 - [ ] 已在 `server/` 和 `ui/` 分别安装依赖。
-- [ ] `.mcp.json` 中的 Node.js 绝对路径适用于接手机器。
+- [ ] `Get-Command node` 可用，Codex 能通过 PATH 启动 `.mcp.json` 中的 `node`。
 - [ ] 未将运行时 `data/plantree-plan.json` 当作示例文件提交或覆盖。
 
 ## 启动与入口
@@ -44,13 +44,8 @@
 ## 交付前集中验证
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm test
-
-Set-Location ..\ui
-npm run typecheck
-
-Set-Location D:\Project\Cambridge\PlanTree
+npm --prefix plugins/plantree/server test
+npm --prefix plugins/plantree/ui run typecheck
 openspec validate graph-interactive-plantree --strict
 ```
 
@@ -87,4 +82,4 @@ openspec validate graph-interactive-plantree --strict
 
 - 本轮规范化不修改源码、MCP/HTTP 契约、任务树 JSON 或运行语义。
 - 未新增 npm 依赖或文档工具。
-- 项目根目录当前没有 Git 元数据，本轮未创建 commit，也未初始化仓库。
+- GitHub 交付仓库使用 `main` 分支；提交前确认运行数据、依赖和构建产物仍被忽略。

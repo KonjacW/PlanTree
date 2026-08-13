@@ -11,11 +11,11 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 操作系统 | Windows 11 |
-| 工作区 | `D:\Project\Cambridge\PlanTree` |
+| 工作区 | 任意本地克隆目录（以下命令从仓库根目录执行） |
 | 模型提供商 | `codexzh` |
 | 接口类型 | Responses API 兼容模式 |
 | MCP 传输 | 本地 stdio |
-| Node.js | `D:\software\Node.js\node.exe`，v24.17.0 |
+| Node.js | PATH 中的 `node`，原始复现环境为 v24.17.0 |
 | MCP SDK | `@modelcontextprotocol/sdk` 1.30.0 |
 
 相关的 Codex 配置保留如下结构：
@@ -64,7 +64,7 @@ Plantree 服务使用预编译 JavaScript 启动，避免 `tsx` 即时编译造�
 {
   "mcpServers": {
     "plantree": {
-      "command": "D:\\software\\Node.js\\node.exe",
+      "command": "node",
       "args": ["${PLUGIN_ROOT}/server/dist/index.js"]
     }
   }
@@ -131,14 +131,13 @@ npm test               # 10 个测试文件、32 个测试全部通过
 在保持 `model_provider = "codexzh"` 的前提下执行：
 
 ```powershell
-codex mcp add plantree-stdio-test -- `
-  D:\software\Node.js\node.exe `
-  D:\Project\Cambridge\PlanTree\plugins\plantree\server\dist\index.js
+$serverEntry = (Resolve-Path "plugins/plantree/server/dist/index.js").Path
+codex mcp add plantree-stdio-test -- node $serverEntry
 
 codex mcp get plantree-stdio-test
 
 codex exec --json --ephemeral --skip-git-repo-check `
-  -C D:\Project\Cambridge\PlanTree `
+  -C (Get-Location).Path `
   "请只列出所有以 mcp__plantree-stdio-test__ 开头的可调用工具名称。不要执行命令、不要读写文件。"
 ```
 

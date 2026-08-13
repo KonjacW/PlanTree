@@ -42,8 +42,7 @@ Get-CimInstance Win32_Process -Filter "ProcessId = <PID>" |
 2. 从插件根重新运行统一启动器：
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree
-npm run web
+npm --prefix plugins/plantree run web
 ```
 
 统一启动器会先重新编译服务端。不要另开终端执行 `npm run web:server`。
@@ -55,8 +54,7 @@ npm run web
 **处理**：
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm run build
+npm --prefix plugins/plantree/server run build
 ```
 
 确认构建完成后再重载 Codex 插件。不要手工创建空的 `dist/index.js`。
@@ -102,7 +100,7 @@ npm run build
 **检查顺序**：
 
 1. 运行 `server/npm run build`，确认 MCP UI 和 `server/dist/index.js` 均生成。
-2. 核对 `.mcp.json` 的 Node.js 路径是否适用于当前机器。
+2. 在 PowerShell 中执行 `Get-Command node`，确认 Node.js 已加入 PATH；完全重启 Codex 以重新读取环境变量。
 3. 核对 Codex 加载的是当前插件目录，而不是旧缓存版本。
 4. 通过数据工具读取或编辑任务树，确认 MCP stdio 服务本身是否正常。
 5. 重新调用 `render_plan_tree`。
@@ -118,11 +116,8 @@ Vite 构建 `@xyflow/react` 时可能报告模块级 `"use client"` 指令被忽
 ## 排障后最小回归
 
 ```powershell
-Set-Location D:\Project\Cambridge\PlanTree\plugins\plantree\server
-npm test
-
-Set-Location ..\ui
-npm run typecheck
+npm --prefix plugins/plantree/server test
+npm --prefix plugins/plantree/ui run typecheck
 ```
 
 若排障涉及 OpenSpec 行为，再运行 strict validate。
