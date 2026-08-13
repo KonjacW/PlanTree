@@ -1,0 +1,26 @@
+{
+  "name": "plantree-mcp-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "npm --prefix ../ui run build:mcp",
+    "dev": "tsx src/index.ts",
+    "prestart": "npm --prefix ../ui run build:mcp",
+    "start": "tsx src/index.ts",
+    "web:server": "node dist/web-server.js",
+    "pretest": "npm --prefix ../ui run build:mcp && tsc --project tsconfig.build.json",
+    "test": "vitest run",
+    "prebuild": "npm --prefix ../ui run build:mcp",
+    "build": "tsc --project tsconfig.build.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

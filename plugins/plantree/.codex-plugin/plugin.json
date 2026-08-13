@@ -1,0 +1,20 @@
+{
+  "name": "plantree",
+  "version": "0.1.0+codex.20260812093759",
+  "description": "Plantree plugin",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Plantree",
+    "shortDescription": "Use Plantree in Codex.",
+    "longDescription": "Plantree adds a local Codex plugin scaffold.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me use Plantree."
+  },
+  "mcpServers": "./.mcp.json",
+  "apps": "./.app.json"
+}

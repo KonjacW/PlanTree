@@ -1,0 +1,20 @@
+{
+  "name": "plantree-local",
+  "interface": {
+    "displayName": "Plantree Local"
+  },
+  "plugins": [
+    {
+      "name": "plantree",
+      "source": {
+        "source": "local",
+        "path": "./plugins/plantree"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

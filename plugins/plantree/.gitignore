@@ -1,0 +1,5 @@
+node_modules/
+dist/
+data/plantree-plan.json
+data/plantree-plan.json.tmp
+*.log

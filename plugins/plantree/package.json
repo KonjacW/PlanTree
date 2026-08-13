@@ -1,0 +1,7 @@
+{
+  "name": "plantree-local-web",
+  "private": true,
+  "scripts": {
+    "web": "node scripts/start-web.mjs"
+  }
+}
