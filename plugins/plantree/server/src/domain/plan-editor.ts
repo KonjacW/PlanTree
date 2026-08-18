@@ -1,5 +1,5 @@
 import { listDescendantIds, PlanRepository } from "./plan-repository.js";
-import type { NodeKind, PlanNode, PlanSnapshot } from "./types.js";
+import type { AcceptanceCriterion, NodeKind, PlanNode, PlanSnapshot } from "./types.js";
 
 type NewNode = {
   readonly id: string;
@@ -7,11 +7,20 @@ type NewNode = {
   readonly objective: string;
   readonly kind: NodeKind;
   readonly dependsOn: readonly string[];
+  readonly method?: string;
+  readonly acceptance?: readonly AcceptanceCriterion[];
 };
 
 export type EditCommand =
   | { readonly type: "add"; readonly parentId: string; readonly node: NewNode }
-  | { readonly type: "rewrite"; readonly nodeId: string; readonly objective: string }
+  | {
+      readonly type: "rewrite";
+      readonly nodeId: string;
+      readonly objective: string;
+      readonly title?: string;
+      readonly method?: string | null;
+      readonly acceptance?: readonly AcceptanceCriterion[];
+    }
   | { readonly type: "expand"; readonly nodeId: string }
   | { readonly type: "prune"; readonly nodeId: string }
   | { readonly type: "prompt"; readonly nodeId: string; readonly customPrompt?: string }
@@ -109,6 +118,8 @@ function applyAdd(plan: MutablePlan, command: Extract<EditCommand, { type: "add"
     dependsOn: [...command.node.dependsOn],
     version: 1,
     source: "user",
+    ...(command.node.method ? { method: command.node.method.trim() } : {}),
+    ...(command.node.acceptance ? { acceptance: structuredClone(command.node.acceptance) } : {}),
   };
   plan.nodes[parent.id] = bumpNode(parent, {
     childIds: [...parent.childIds, command.node.id],
@@ -122,11 +133,27 @@ function applyRewrite(
   if (!command.objective.trim()) {
     throw new Error("节点目标不能为空。");
   }
+  if (command.title !== undefined && !command.title.trim()) {
+    throw new Error("节点标题不能为空。");
+  }
+  if (typeof command.method === "string" && !command.method.trim()) {
+    throw new Error("节点方法不能为空。");
+  }
   const node = requireNode(plan, command.nodeId);
-  plan.nodes[node.id] = bumpNode(node, {
+  const { customPrompt: _customPrompt, customPromptBaseVersion: _customPromptBaseVersion, ...structuredNode } = node;
+  const rewritten = bumpNode(structuredNode, {
+    ...(command.title === undefined ? {} : { title: command.title.trim() }),
     objective: command.objective.trim(),
+    ...(typeof command.method === "string" ? { method: command.method.trim() } : {}),
+    ...(command.acceptance === undefined ? {} : { acceptance: structuredClone(command.acceptance) }),
     status: "pending_planning",
   });
+  if (command.method === null) {
+    const { method: _method, ...withoutMethod } = rewritten;
+    plan.nodes[node.id] = withoutMethod;
+  } else {
+    plan.nodes[node.id] = rewritten;
+  }
 }
 
 function applyExpand(

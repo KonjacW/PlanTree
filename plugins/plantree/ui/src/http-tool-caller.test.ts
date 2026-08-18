@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createHttpToolCaller, PlanVersionConflictClientError } from "./http-tool-caller";
+import { createHttpMessageSender, createHttpToolCaller, PlanVersionConflictClientError } from "./http-tool-caller";
 
 describe("HTTP 工具调用适配器", () => {
   it("将展开命令发送给编辑 API", async () => {
@@ -38,6 +38,35 @@ describe("HTTP 工具调用适配器", () => {
     expect(fetchStub.mock.calls.map(([, request]) => (request as RequestInit).body)).toEqual([
       JSON.stringify({ expectedVersion: 3 }), JSON.stringify({ expectedVersion: 4 }), JSON.stringify({ expectedVersion: 5 }), JSON.stringify({ expectedVersion: 6 }),
     ]);
+  });
+
+  it("将执行链编译、领取和完成映射到真实执行 API", async () => {
+    const fetchStub = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ snapshot: { id: "plan" }, chain: { tasks: [] } })));
+    const caller = createHttpToolCaller("", fetchStub);
+
+    await caller("compile_execution_chain");
+    await caller("start_next_task", { expectedVersion: 7 });
+    await caller("complete_task", { nodeId: "n12", expectedVersion: 8 });
+
+    expect(fetchStub.mock.calls.map(([url]) => url)).toEqual([
+      "/api/execution/chain",
+      "/api/execution/next",
+      "/api/execution/n12/complete",
+    ]);
+    expect(fetchStub.mock.calls.map(([, request]) => (request as RequestInit).body)).toEqual([
+      JSON.stringify({}),
+      JSON.stringify({ expectedVersion: 7 }),
+      JSON.stringify({ expectedVersion: 8 }),
+    ]);
+  });
+
+  it("从侧栏一次点击提交兼容执行请求", async () => {
+    const fetchStub = vi.fn().mockResolvedValue(new Response(JSON.stringify({ request: { requestId: 1 } }), { status: 200 }));
+    const sender = createHttpMessageSender("", fetchStub);
+
+    await sender({ message: "执行", snapshot: { id: "plan", version: 7 } as never, chain: {} as never });
+
+    expect(fetchStub).toHaveBeenCalledWith("/api/execution/request", expect.objectContaining({ method: "POST", body: JSON.stringify({ planId: "plan", snapshotVersion: 7 }) }));
   });
 
   it("将同级排序映射到本机移动接口", async () => {

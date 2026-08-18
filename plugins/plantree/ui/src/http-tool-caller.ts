@@ -1,4 +1,5 @@
 import type { ToolCaller } from "./PlanTreeWindow";
+import type { MessageSender } from "./PlanTreeWindow";
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -17,9 +18,22 @@ export function createHttpToolCaller(baseUrl: string, fetcher: FetchLike = fetch
   };
 }
 
+export function createHttpMessageSender(baseUrl: string, fetcher: FetchLike = fetch): MessageSender {
+  return async ({ snapshot }) => {
+    const response = await fetcher(`${baseUrl}/api/execution/request`, post("/api/execution/request", { planId: snapshot.id, snapshotVersion: snapshot.version }).init);
+    const body = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(body.error ?? "无法通知 Codex 开始自动执行。");
+  };
+}
+
 function toRequest(name: string, args: Record<string, unknown>): { path: string; init: RequestInit } {
   if (name === "move_node") return post("/api/nodes/move", args);
   if (name === "edit_node") return post("/api/nodes/edit", args);
+  if (name === "compile_execution_chain") return post("/api/execution/chain", {});
+  if (name === "start_next_task") return post("/api/execution/next", { expectedVersion: args.expectedVersion });
+  if (name === "complete_task" && typeof args.nodeId === "string") {
+    return post(`/api/execution/${encodeURIComponent(args.nodeId)}/complete`, { expectedVersion: args.expectedVersion });
+  }
   if (name === "simulate_execution" && typeof args.nodeId === "string") {
     return post(`/api/nodes/${encodeURIComponent(args.nodeId)}/simulate`, { expectedVersion: args.expectedVersion });
   }

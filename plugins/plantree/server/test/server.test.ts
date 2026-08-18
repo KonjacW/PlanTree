@@ -7,9 +7,11 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DemoSession } from "../src/application/demo-session.js";
+import { CodexConversationBridge } from "../src/application/codex-conversation-bridge.js";
+import { ConversationBindingStore } from "../src/application/conversation-binding-store.js";
+import { ExecutionRequestStore } from "../src/application/execution-request-store.js";
 import { PersistentPlanStore } from "../src/application/persistent-plan-store.js";
 import { createPlanTreeServer, planToolOutputSchema, serverMetadata } from "../src/server.js";
-import { planTreeUiHtml } from "../src/ui-resource.js";
 
 describe("PlanTree MCP 服务配置", () => {
   let directory: string | undefined;
@@ -24,6 +26,7 @@ describe("PlanTree MCP 服务配置", () => {
     const { client, close } = await connect();
     try {
       const tools = await client.listTools();
+      expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(["build_planner_prompt", "import_task_tree", "compile_execution_chain", "start_next_task", "complete_task"]));
       expect(tools.tools.find((tool) => tool.name === "move_node")?.inputSchema).toMatchObject({ properties: { expectedVersion: expect.any(Object) }, required: expect.arrayContaining(["expectedVersion"]) });
       expect(tools.tools.find((tool) => tool.name === "redo_last_edit")?.inputSchema).toMatchObject({ properties: { expectedVersion: expect.any(Object) }, required: expect.arrayContaining(["expectedVersion"]) });
       const initial = await client.callTool({ name: "create_or_load_demo", arguments: {} });
@@ -46,20 +49,35 @@ describe("PlanTree MCP 服务配置", () => {
       expect((stale.structuredContent as any).snapshot).toEqual((first.structuredContent as any).snapshot);
     } finally { await close(); }
   });
-  it("只由渲染工具关联 PlanTree 小窗资源", async () => {
-    const { client, close } = await connect();
-    try { const tools = await client.listTools(); const render = tools.tools.find((tool) => tool.name === "render_plan_tree"); expect(render?._meta).toMatchObject({ ui: { resourceUri: "ui://plantree/plan-tree.html" } }); expect((await client.callTool({ name: "render_plan_tree", arguments: {} })).isError).not.toBe(true); } finally { await close(); }
+  it("渲染工具返回侧栏链接并绑定当前 Codex 对话", async () => {
+    const { client, close, executionRequests, conversationBindings } = await connect();
+    try {
+      const threadId = "019ff54b-adcb-7982-880f-15db0ce32449";
+      const result = await client.callTool({ name: "render_plan_tree", arguments: {}, _meta: { threadId, cwd: "C:\\workspace" } } as any);
+      expect(result.isError).not.toBe(true);
+      expect(result.content).toContainEqual(expect.objectContaining({ type: "resource_link", uri: "http://127.0.0.1:5174" }));
+      await expect(conversationBindings.read()).resolves.toMatchObject({ planId: "demo-import-wizard-crash", threadId, cwd: "C:\\workspace" });
+      expect((await client.listTools()).tools.find((tool) => tool.name === "render_plan_tree")?._meta?.ui).toBeUndefined();
+      const request = await executionRequests.create("test-plan", 3);
+      const waited = await client.callTool({ name: "wait_for_execution_request", arguments: { afterRequestId: 0, timeoutSeconds: 1 } });
+      expect(waited.structuredContent).toMatchObject({ requested: true, requestId: request.requestId, planId: "test-plan", snapshotVersion: 3 });
+    } finally { await close(); }
   });
-  it("MCP 小窗资源内嵌同一 React 任务图应用", () => {
-    expect(planTreeUiHtml).toContain("PlanTree · 任务树");
-    expect(planTreeUiHtml).toContain("<script type=\"module\">");
-    expect(planTreeUiHtml).toContain("plantree-window");
+  it("不再注册内嵌任务树资源", async () => {
+    const { client, close } = await connect();
+    try { await expect(client.listResources()).rejects.toThrow("Method not found"); }
+    finally { await close(); }
   });
   it("MCP 路径不发起外部网络请求", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("不应调用外部网络")); const { client, close } = await connect();
     try { await client.callTool({ name: "create_or_load_demo", arguments: {} }); expect(fetchSpy).not.toHaveBeenCalled(); } finally { await close(); fetchSpy.mockRestore(); }
   });
   async function connect() {
-    directory = await mkdtemp(join(tmpdir(), "plantree-mcp-")); const server = createPlanTreeServer(new DemoSession(new PersistentPlanStore(join(directory, "plan.json")))); const client = new Client({ name: "test", version: "1" }); const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair(); await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]); return { client, close: async () => Promise.all([client.close(), server.close()]) };
+    directory = await mkdtemp(join(tmpdir(), "plantree-mcp-"));
+    const executionRequests = new ExecutionRequestStore(join(directory, "execution-request.json"));
+    const conversationBindings = new ConversationBindingStore(join(directory, "binding.json"));
+    const bridge = new CodexConversationBridge(async () => "codex-test", async () => undefined);
+    const server = createPlanTreeServer(new DemoSession(new PersistentPlanStore(join(directory, "plan.json"))), executionRequests, async () => "http://127.0.0.1:5174", conversationBindings, bridge);
+    const client = new Client({ name: "test", version: "1" }); const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair(); await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]); return { client, executionRequests, conversationBindings, close: async () => Promise.all([client.close(), server.close()]) };
   }
 });

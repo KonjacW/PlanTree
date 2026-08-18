@@ -8,6 +8,13 @@ export type NodeStatus =
   | "skipped"
   | "invalid";
 
+export type AcceptanceType = "test" | "metric" | "evaluation";
+
+export interface AcceptanceCriterion {
+  readonly type: AcceptanceType;
+  readonly criterion: string;
+}
+
 export interface PlanNode {
   readonly id: string;
   readonly title: string;
@@ -19,6 +26,8 @@ export interface PlanNode {
   readonly dependsOn: readonly string[];
   readonly version: number;
   readonly source: "demo" | "user" | "planner";
+  readonly method?: string;
+  readonly acceptance?: readonly AcceptanceCriterion[];
   readonly customPrompt?: string;
   readonly customPromptBaseVersion?: number;
 }
@@ -39,6 +48,9 @@ export interface AuditEntry {
     | "replanned"
     | "validated"
     | "execution_simulated"
+    | "tree_imported"
+    | "execution_started"
+    | "execution_completed"
     | "undone"
     | "reset";
   readonly nodeIds: readonly string[];

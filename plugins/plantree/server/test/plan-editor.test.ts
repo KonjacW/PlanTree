@@ -44,6 +44,35 @@ describe("PlanEditor", () => {
     });
   });
 
+  it("结构化改写可清除方法和验收，并移除旧人工提示词", () => {
+    const withLegacyPrompt = {
+      ...initialDemoPlan,
+      nodes: {
+        ...initialDemoPlan.nodes,
+        repair: {
+          ...initialDemoPlan.nodes.repair,
+          method: "旧方法",
+          acceptance: [{ type: "test" as const, criterion: "旧验收" }],
+          customPrompt: "旧人工提示词",
+          customPromptBaseVersion: 1,
+        },
+      },
+    };
+    const rewritten = new PlanEditor(withLegacyPrompt).apply({
+      type: "rewrite",
+      nodeId: "repair",
+      title: "新任务",
+      objective: "新任务",
+      method: null,
+      acceptance: [],
+    });
+
+    expect(rewritten.nodes.repair).toMatchObject({ title: "新任务", objective: "新任务", acceptance: [] });
+    expect(rewritten.nodes.repair).not.toHaveProperty("method");
+    expect(rewritten.nodes.repair).not.toHaveProperty("customPrompt");
+    expect(rewritten.nodes.repair).not.toHaveProperty("customPromptBaseVersion");
+  });
+
   it("展开阶段节点时标记为待规划", () => {
     const editor = new PlanEditor(initialDemoPlan);
 

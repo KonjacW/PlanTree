@@ -4,14 +4,21 @@ import { dirname, resolve } from "node:path";
 import { analyzeImpact } from "../domain/impact-analysis.js";
 import { appendAuditEntry } from "../domain/audit-log.js";
 import { initialDemoPlan } from "../domain/demo.js";
+import { buildExecutionChain, type ExecutionChain, type ExecutionTaskEnvelope } from "../domain/execution-chain.js";
 import { type EditCommand, PlanEditor } from "../domain/plan-editor.js";
 import { synchronizeDependencies } from "../domain/plan-validation.js";
-import { simulateExecution } from "../domain/execution-simulator.js";
+import { beginExecution, completeExecution, simulateExecution } from "../domain/execution-simulator.js";
 import { replan } from "../domain/simulated-planner.js";
+import { taskTreeToPlanSnapshot, type TaskTree } from "../domain/task-tree.js";
 import type { PlanSnapshot } from "../domain/types.js";
 import { PersistentPlanStore, PlanVersionConflictError } from "./persistent-plan-store.js";
 
 export interface DemoLoadResult { readonly snapshot: PlanSnapshot; readonly summary: string; }
+export interface ExecutionChainResult extends DemoLoadResult { readonly chain: ExecutionChain; }
+export interface ExecutionStepResult extends ExecutionChainResult {
+  readonly task?: ExecutionTaskEnvelope;
+  readonly done: boolean;
+}
 
 export function createOrLoadDemo(): DemoLoadResult {
   return { snapshot: structuredClone(initialDemoPlan), summary: "已加载 PlanTree 缺陷修复演示任务。" };
@@ -29,6 +36,81 @@ export class DemoSession {
   constructor(private readonly store = new PersistentPlanStore(getDefaultStorePath())) {}
 
   async read(): Promise<DemoLoadResult> { return { snapshot: await this.store.read(), summary: "已读取 PlanTree 演示会话。" }; }
+
+  async importTaskTree(tree: TaskTree, expectedVersion: number): Promise<DemoLoadResult> {
+    const before = await this.store.read();
+    const imported = taskTreeToPlanSnapshot(tree, before.version + 1);
+    const snapshot = await this.store.write(imported, expectedVersion);
+    this.#undoStack = [];
+    this.#redoStack = [];
+    this.#historyHeadVersion = snapshot.version;
+    return { snapshot, summary: `已导入任务树“${tree.treeId}”，共 ${tree.nodes.length} 个节点。` };
+  }
+
+  async compileExecutionChain(): Promise<ExecutionChainResult> {
+    const snapshot = await this.store.read();
+    const chain = buildExecutionChain(snapshot);
+    return { snapshot, chain, summary: `已按深度优先叶节点顺序生成 ${chain.taskCount} 个执行任务。` };
+  }
+
+  async startNext(expectedVersion: number): Promise<ExecutionStepResult> {
+    const before = await this.store.read();
+    this.#assertExpectedVersion(before, expectedVersion);
+    const currentChain = buildExecutionChain(before);
+    const active = currentChain.tasks.find((task) => task.status === "in_progress");
+    if (active) return { snapshot: before, chain: currentChain, task: active, done: false, summary: `节点“${active.nodeId}”正在执行。` };
+    const nextTask = currentChain.tasks.find((task) => task.status !== "completed");
+    if (!nextTask) return { snapshot: before, chain: currentChain, done: true, summary: "执行链中的任务已全部完成。" };
+
+    const started = beginExecution(before, nextTask.nodeId);
+    const prepared = appendAuditEntry(started, {
+      timestamp: new Date().toISOString(),
+      type: "execution_started",
+      nodeIds: [nextTask.nodeId],
+      versionBefore: before.version,
+      versionAfter: started.version,
+      affectedNodeIds: [nextTask.nodeId],
+      outcome: "success",
+      summary: `已开始执行节点“${nextTask.nodeId}”。`,
+    });
+    const snapshot = await this.store.write(prepared, expectedVersion);
+    this.#recordMutation(before, snapshot);
+    const chain = buildExecutionChain(snapshot);
+    const task = chain.tasks.find((item) => item.nodeId === nextTask.nodeId);
+    return { snapshot, chain, task, done: false, summary: `已领取执行链中的第 ${nextTask.sequence} 个任务。` };
+  }
+
+  async complete(nodeId: string, expectedVersion: number): Promise<ExecutionStepResult> {
+    const before = await this.store.read();
+    this.#assertExpectedVersion(before, expectedVersion);
+    const beforeChain = buildExecutionChain(before);
+    const active = beforeChain.tasks.find((task) => task.status === "in_progress");
+    if (!active) throw new Error("当前没有正在执行的任务。");
+    if (active.nodeId !== nodeId) throw new Error(`当前应完成节点“${active.nodeId}”，不能跳过执行顺序。`);
+
+    const completed = completeExecution(before, nodeId);
+    const prepared = appendAuditEntry(completed, {
+      timestamp: new Date().toISOString(),
+      type: "execution_completed",
+      nodeIds: [nodeId],
+      versionBefore: before.version,
+      versionAfter: completed.version,
+      affectedNodeIds: [nodeId],
+      outcome: "success",
+      summary: `已完成执行节点“${nodeId}”。`,
+    });
+    const snapshot = await this.store.write(prepared, expectedVersion);
+    this.#recordMutation(before, snapshot);
+    const chain = buildExecutionChain(snapshot);
+    const nextTask = chain.tasks.find((task) => task.status !== "completed");
+    return {
+      snapshot,
+      chain,
+      ...(nextTask ? { task: nextTask } : {}),
+      done: nextTask === undefined,
+      summary: nextTask ? `已完成节点“${nodeId}”；下一任务为“${nextTask.nodeId}”。` : "执行链中的任务已全部完成。",
+    };
+  }
 
   async edit(command: EditCommand, expectedVersion: number): Promise<DemoLoadResult> {
     const before = await this.store.read();
@@ -101,6 +183,17 @@ export class DemoSession {
     this.#redoStack = [];
     this.#historyHeadVersion = snapshot.version;
     return { snapshot, summary: `已完成节点 "${nodeId}" 的模拟执行。` };
+  }
+
+  #recordMutation(before: PlanSnapshot, snapshot: PlanSnapshot): void {
+    if (this.#historyHeadVersion !== undefined && before.version !== this.#historyHeadVersion) this.#undoStack = [];
+    this.#undoStack.push(before);
+    this.#redoStack = [];
+    this.#historyHeadVersion = snapshot.version;
+  }
+
+  #assertExpectedVersion(current: PlanSnapshot, expectedVersion: number): void {
+    if (current.version !== expectedVersion) throw new PlanVersionConflictError(current);
   }
 
   #assertHistoryCurrent(current: PlanSnapshot, expectedVersion: number): void {

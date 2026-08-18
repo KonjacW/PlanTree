@@ -4,25 +4,27 @@ import { deriveNodePrompt, getNodePromptState, validateCustomPrompt } from "./pr
 
 const snapshot = { id: "plan", version: 1, rootNodeId: "root", nodes: {
   root: { id: "root", title: "目标", objective: "交付", kind: "goal" as const, status: "pending" as const, parentId: null, childIds: ["phase"], dependsOn: [], version: 1, source: "demo" as const },
-  phase: { id: "phase", title: "阶段", objective: "分析", kind: "phase" as const, status: "pending" as const, parentId: "root", childIds: ["task"], dependsOn: [], version: 1, source: "demo" as const },
+  phase: { id: "phase", title: "阶段", objective: "分析", kind: "phase" as const, status: "pending" as const, parentId: "root", childIds: ["task"], dependsOn: [], version: 1, source: "demo" as const, method: "对现有实现做静态检查", acceptance: [{ type: "test" as const, criterion: "测试全部通过" }] },
   task: { id: "task", title: "任务", objective: "实施", kind: "task" as const, status: "pending" as const, parentId: "phase", childIds: [], dependsOn: ["phase"], version: 1, source: "demo" as const },
 }, validation: { valid: true, issues: [] }, audit: [] };
 
 describe("deriveNodePrompt", () => {
-  it("只从当前快照派生完整的单节点规划上下文", () => {
-    expect(deriveNodePrompt(snapshot, "phase")).toBe("你正在处理 PlanTree 中的节点。\n\n节点：阶段\n类型：阶段\n状态：待执行\n目标：分析\n父节点：目标\n直接子节点：任务\n前置依赖：无\n\n请保持任务树的结构、依赖和版本一致性，只提出与该节点相关的下一步建议。");
+  it("只展示任务、方法和验收，不把图结构元数据写入正文", () => {
+    const prompt = deriveNodePrompt(snapshot, "phase");
+    expect(prompt).toBe("### 任务\n\n仅完成：分析\n\n### 方法\n\n对现有实现做静态检查\n\n### 验收\n\n- **测试**：测试全部通过");
+    expect(prompt).not.toMatch(/节点：|类型：|状态：|父节点：|直接子节点：|前置依赖：/);
     expect(deriveNodePrompt(snapshot, "missing")).toBeUndefined();
   });
 
-  it("依赖未完成时按 Preview 显示等待前置任务", () => {
-    expect(deriveNodePrompt(snapshot, "task")).toContain("状态：等待前置任务");
+  it("没有显式验收时仅补充 Agent 自评要求", () => {
+    expect(deriveNodePrompt(snapshot, "task")).toBe("### 任务\n\n仅完成：实施\n\n### 验收\n\n完成后自行评价当前任务是否完成，并简要说明判断依据。");
   });
 
-  it("在自动与人工提示词之间选择并识别过期覆盖", () => {
+  it("始终由节点结构化内容生成提示词，旧人工文本不再覆盖", () => {
     expect(getNodePromptState(snapshot, "phase")).toMatchObject({
       source: "derived",
       stale: false,
-      text: expect.stringContaining("节点：阶段"),
+      text: expect.stringContaining("仅完成：分析"),
     });
     const customized = {
       ...snapshot,
@@ -31,7 +33,7 @@ describe("deriveNodePrompt", () => {
         phase: { ...snapshot.nodes.phase, version: 3, customPrompt: "人工文本", customPromptBaseVersion: 2 },
       },
     };
-    expect(getNodePromptState(customized, "phase")).toEqual({ source: "custom", stale: true, text: "人工文本" });
+    expect(getNodePromptState(customized, "phase")).toMatchObject({ source: "derived", stale: false, text: expect.stringContaining("仅完成：分析") });
   });
 
   it.each([

@@ -5,12 +5,12 @@
 - Windows PowerShell。
 - Node.js 20 或更高版本，并确保 `node`、`npm` 已加入 PATH；依赖版本以两个 `package-lock.json` 为准。
 - 如需执行规范校验，安装可用的 `openspec` CLI。
-- Codex MCP PiP 走查需要支持本地插件和 MCP UI 的 Codex 宿主。
+- Codex 侧栏执行走查需要支持本地插件与资源链接的 Codex 宿主。
 
 项目由两个独立 npm 工作区组成：
 
 - `server/`：MCP、HTTP、领域逻辑与持久化。
-- `ui/`：Web 与 MCP PiP 共用 React 应用。
+- `ui/`：侧栏 Web React 应用。
 
 插件根 `package.json` 只提供统一 Web 启动命令。
 
@@ -46,13 +46,11 @@ Vite 使用 `strictPort: true`，端口占用时启动失败，不会自动改�
 npm --prefix plugins/plantree/server run build
 ```
 
-服务端 `prebuild` 会运行 UI 的 `build:mcp`：
+服务端 `prebuild` 会先用 Vite 构建侧栏到 `ui/dist`，再用 TypeScript 将服务端源码编译到 `server/dist`。
 
-1. Vite 将 MCP 应用构建到 `ui/dist/mcp`。
-2. `ui/scripts/embed-mcp-app.mjs` 将资源嵌入服务端可用模块。
-3. TypeScript 将服务端源码编译到 `server/dist`。
+`.mcp.json` 使用 PATH 中的 `node`。启动代码先读取可选的 `PLANTREE_PLUGIN_ROOT`（测试/开发覆盖），再定位默认个人插件目录 `~/plugins/plantree`，因此可以从任意工作目录启动，也不依赖宿主展开 `${PLUGIN_ROOT}`。如果 Codex 无法找到 Node.js，先确认 `Get-Command node`，然后完全重启 Codex以重新读取 PATH。不要将个人机器的绝对 Node.js 路径提交到仓库。
 
-`.mcp.json` 使用 PATH 中的 `node` 和 `${PLUGIN_ROOT}/server/dist/index.js`。如果 Codex 无法找到 Node.js，先确认 `Get-Command node`，然后完全重启 Codex 以重新读取 PATH。不要将个人机器的绝对 Node.js 路径提交到仓库。
+`render_plan_tree` 启动并返回绑定 `127.0.0.1:5174` 的侧栏入口，同时把计划绑定到调用元数据中的 Codex `threadId`。侧栏执行按钮向本地 API 提交版本化请求，本地桥接调用 `codex exec resume <threadId>`，让原对话的新回合直接进入执行链。项目不再注册 MCP App 或内嵌任务树资源。
 
 首次安装仓库内的本地插件：
 
@@ -71,7 +69,7 @@ codex plugin add plantree@plantree-local
 npm --prefix plugins/plantree/server test
 ```
 
-当前 `pretest` 会先生成 MCP UI 和服务端构建，因此该命令同时检查干净构建入口与 14 个服务端测试文件。
+当前 `pretest` 会先生成侧栏 UI 和服务端构建，因此该命令同时检查干净构建入口与服务端测试文件。
 
 ### 仅修改 UI 类型或纯函数
 
@@ -82,13 +80,13 @@ npm --prefix plugins/plantree/ui run typecheck
 
 可在开发中定向运行单个 Vitest 文件；交付前再运行完整 UI 测试。
 
-### 修改 UI 构建或 MCP 资源
+### 修改 UI 构建
 
 ```powershell
 npm --prefix plugins/plantree/ui run build
 ```
 
-该命令生成普通 Web 产物和 MCP 内嵌 UI 产物。
+该命令生成侧栏 Web 产物。
 
 ### 修改 OpenSpec 范围内行为
 
@@ -121,7 +119,7 @@ openspec validate graph-interactive-plantree --strict
 | `data/plantree-plan.example.json` | 是 | 可提交示例数据。 |
 | `data/plantree-plan.json` | 运行数据 | 本机任务树状态，已忽略。 |
 | `server/dist` | 可再生 | MCP 与 Web API JavaScript 构建；MCP 运行需要。 |
-| `ui/dist` | 可再生 | Web 与 MCP UI 构建产物。 |
+| `ui/dist` | 可再生 | 侧栏 Web 构建产物。 |
 | `server/node_modules`、`ui/node_modules` | 可再生 | 独立依赖目录。 |
 | `openspec/changes` | 是 | 已确认变更的设计、规格和任务。 |
 

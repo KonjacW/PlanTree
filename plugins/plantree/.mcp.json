@@ -3,7 +3,9 @@
     "plantree": {
       "command": "node",
       "args": [
-        "${PLUGIN_ROOT}/server/dist/index.js"
+        "--input-type=module",
+        "--eval",
+        "const { access } = await import('node:fs/promises'); const { homedir } = await import('node:os'); const { join } = await import('node:path'); const { pathToFileURL } = await import('node:url'); const roots = [process.env.PLANTREE_PLUGIN_ROOT, join(homedir(), 'plugins', 'plantree')].filter(Boolean); let entry; for (const root of roots) { const candidate = join(root, 'server', 'dist', 'index.js'); try { await access(candidate); entry = candidate; break; } catch {} } if (!entry) throw new Error('PlanTree MCP build not found. Run the server build and reinstall the plugin.'); await import(pathToFileURL(entry).href);"
       ]
     }
   }

@@ -4,14 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "npm --prefix ../ui run build:mcp",
+    "predev": "npm --prefix ../ui run build",
     "dev": "tsx src/index.ts",
-    "prestart": "npm --prefix ../ui run build:mcp",
+    "prestart": "npm --prefix ../ui run build",
     "start": "tsx src/index.ts",
     "web:server": "node dist/web-server.js",
-    "pretest": "npm --prefix ../ui run build:mcp && tsc --project tsconfig.build.json",
+    "pretest": "npm --prefix ../ui run build && tsc --project tsconfig.build.json",
     "test": "vitest run",
-    "prebuild": "npm --prefix ../ui run build:mcp",
+    "prebuild": "npm --prefix ../ui run build",
     "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {

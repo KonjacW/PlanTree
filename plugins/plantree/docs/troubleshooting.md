@@ -32,7 +32,7 @@ Get-CimInstance Win32_Process -Filter "ProcessId = <PID>" |
 
 ## 页面显示“编辑参数不完整”
 
-**现象**：新 UI 可以打开，但保存人工提示词等新操作返回旧参数错误。
+**现象**：新 UI 可以打开，但保存任务、方法或验收等节点内容时返回旧参数错误。
 
 **原因**：页面连接到旧 `server/dist` 或旧 API 进程。
 
@@ -95,21 +95,25 @@ npm --prefix plugins/plantree/server run build
 
 这是当前会话级设计，不是数据丢失。任务树本身仍在状态文件中。
 
-## Web 正常但 Codex PiP 不显示
+## 侧栏正常但点击后 Codex 没有执行
 
 **检查顺序**：
 
-1. 运行 `server/npm run build`，确认 MCP UI 和 `server/dist/index.js` 均生成。
+1. 运行 `server/npm run build`，确认侧栏 UI 和 `server/dist/index.js` 均生成。
 2. 在 PowerShell 中执行 `Get-Command node`，确认 Node.js 已加入 PATH；完全重启 Codex 以重新读取环境变量。
 3. 核对 Codex 加载的是当前插件目录，而不是旧缓存版本。
 4. 通过数据工具读取或编辑任务树，确认 MCP stdio 服务本身是否正常。
-5. 重新调用 `render_plan_tree`。
+5. 在创建任务树的 Codex 对话中重新调用 `render_plan_tree`，确认已写入 `data/conversation-binding.json`。
+6. 确认 `%LOCALAPPDATA%\OpenAI\Codex\bin\*\codex.exe` 存在；需要覆盖路径时设置 `PLANTREE_CODEX_PATH`。
+7. 点击侧栏“开始自动执行”，检查返回提示是否为“已在原 Codex 对话启动执行”，并确认该对话出现新回合。
 
-PiP 是否渲染取决于 Codex 宿主能力。宿主不显示小窗时，不能据此认定服务端数据工具失败。
+当前启动器不再使用 `${PLUGIN_ROOT}` 字面路径；日志中若仍出现该字符串，说明 Codex 还在加载旧插件缓存，需重新安装插件并在新任务中验证。
+
+PlanTree 永久不提供内嵌任务树。正常流程不要求原 Codex 回合保持运行；侧栏请求会恢复创建该树的原对话。若绑定缺失或计划 ID 不匹配，服务端会拒绝启动，以免回复进入错误对话。
 
 ## 构建出现 `use client` ignored 警告
 
-Vite 构建 `@xyflow/react` 时可能报告模块级 `"use client"` 指令被忽略。当前 Web 与 MCP 构建均能成功，该信息属于已知上游打包警告。
+Vite 构建 `@xyflow/react` 时可能报告模块级 `"use client"` 指令被忽略。当前侧栏 Web 构建能成功，该信息属于已知上游打包警告。
 
 只有当构建退出码非零、产物缺失或页面运行失败时，才将其视为阻塞；不要通过复制或修改第三方包源码消除警告。
 

@@ -16,12 +16,25 @@ export function simulateExecution(
     return { inProgress: plan, completed: plan, blocker };
   }
 
-  const inProgress = updateExecutionStatus(plan, nodeId, "in_progress");
+  const inProgress = beginExecution(plan, nodeId);
   return {
     inProgress,
-    completed: updateExecutionStatus(inProgress, nodeId, "completed"),
+    completed: completeExecution(inProgress, nodeId),
     blocker: null,
   };
+}
+
+export function beginExecution(plan: PlanSnapshot, nodeId: string): PlanSnapshot {
+  const blocker = getExecutionBlocker(plan, nodeId);
+  if (blocker) throw new Error(blocker);
+  return updateExecutionStatus(plan, nodeId, "in_progress");
+}
+
+export function completeExecution(plan: PlanSnapshot, nodeId: string): PlanSnapshot {
+  const node = plan.nodes[nodeId];
+  if (!node) throw new Error(`计划中不存在节点 "${nodeId}"。`);
+  if (node.status !== "in_progress") throw new Error(`节点 "${nodeId}" 尚未开始执行。`);
+  return updateExecutionStatus(plan, nodeId, "completed");
 }
 
 function updateExecutionStatus(

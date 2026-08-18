@@ -6,6 +6,7 @@ PlanTree 是一个本地 Node.js + TypeScript 图形任务树项目，同时提�
 - Codex MCP 工具
 - Codex MCP PiP 图形界面
 - 文件持久化、版本冲突保护、撤销与重做
+- 从用户总目标生成树、人工调树并按叶节点顺序真实执行的完整链路
 
 ## 环境要求
 
@@ -107,8 +108,23 @@ codex plugin add plantree@plantree-local
 ```powershell
 npm --prefix plugins/plantree/server test
 npm --prefix plugins/plantree/ui run typecheck
+npm --prefix plugins/plantree/ui test
 openspec validate graph-interactive-plantree --strict
 ```
+
+## 完整规划与执行链
+
+Codex 通过插件按以下协议工作：
+
+1. `build_planner_prompt`：把用户总目标转换为精简 TaskTree JSON 规划提示词。
+2. Codex 生成 JSON 后调用 `import_task_tree`，UI 显示并允许用户改写、排序或删除节点。
+3. `compile_execution_chain`：只收集未删除的可执行叶节点，按 `childIds` 深度优先顺序生成任务提示词。
+4. `start_next_task`：一次只领取一个任务并标记为执行中。
+5. Codex 完成当前任务后调用 `complete_task`，然后领取下一项，直至 `done: true`。
+
+在 Codex 内嵌 UI 中点击“交给 Codex 执行剩余队列”，UI 会通过 MCP App `sendMessage` 向当前对话发送一次执行协议。Codex 随后自行循环领取、实际执行和验收任务，无需逐条复制提示词；任务失败、需要审批或验收未通过时会停在当前节点。
+
+麒麟 OS 记忆系统的完整回归样例位于 `plugins/plantree/data/kylin-memory-task-tree.example.json`。测试中的人工修改会删除 `n3`、`n10`、`n11`，把 `n12` 改为生成 `mock_plan.md`，最终执行顺序为 `n4 → n5 → n7 → n8 → n9 → n12`。
 
 如果本机没有安装 OpenSpec CLI，可以先完成前两项；OpenSpec 校验主要用于继续维护规范变更。
 

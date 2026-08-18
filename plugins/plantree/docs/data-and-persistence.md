@@ -31,8 +31,10 @@ interface PlanSnapshot {
 | `dependsOn` | 显式依赖节点 ID 列表。 |
 | `version` | 节点内容版本，用于识别节点变化。 |
 | `source` | `demo`、`user` 或 `planner`。 |
-| `customPrompt` | 可选人工提示词；不存在时使用前端纯函数生成的自动提示词。 |
-| `customPromptBaseVersion` | 保存人工提示词时的节点版本，用于提示人工内容可能过期。 |
+| `method` | 可选方法；一个节点最多表示一种方法组合。 |
+| `acceptance` | 可选测试、指标或评价验收；为空时执行提示词要求 Agent 自评。 |
+| `customPrompt` | 旧客户端兼容字段；当前 UI 与执行链忽略它，结构化改写时会清除。 |
+| `customPromptBaseVersion` | 旧客户端兼容字段；当前 UI 与执行链忽略它。 |
 
 树关系只由 `parentId` 和 `childIds` 表示；显式依赖只由 `dependsOn` 表示。不要从数组位置推导额外业务依赖。
 
@@ -81,7 +83,7 @@ JSON 无法解析或最低结构校验失败时返回“任务树状态文件无
 ## 版本语义
 
 - 计划级 `version` 用于跨入口并发控制。
-- 节点级 `version` 用于识别单节点变化以及人工提示词是否可能过期。
+- 节点级 `version` 用于识别单节点内容变化。
 - 撤销、重做和重置也生成新的计划版本，不回退版本号。
 - 客户端不能自行修改版本或用旧快照直接覆盖服务端文件。
 

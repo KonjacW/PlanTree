@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "treeId": "tree-kylin-manual-preferences-codex-reference",
+  "rootId": "n1",
+  "nodes": [
+    { "id": "n1", "task": "制定麒麟OS手动偏好配置系统的实施计划" },
+    { "id": "n2", "task": "形成现有系统与Codex机制的研究基线" },
+    { "id": "n3", "task": "盘点现有MemoryEngine的偏好数据流与扩展点", "method": "审查Observation、Evidence、Memory、ConflictGroup、生命周期、检索和现有配置模块" },
+    { "id": "n4", "task": "整理Codex配置与记忆机制的官方设计资料", "method": "研究Config Basics、Config Reference、AGENTS.md和Memories官方文档中的分层、作用域与优先级规则" },
+    { "id": "n5", "task": "追踪Codex公开源码中的配置解析与合并实现", "method": "在OpenAI Codex公开仓库中定位配置加载、项目覆盖、指令发现、信任边界和记忆开关相关代码" },
+    { "id": "n6", "task": "形成手动偏好配置系统的目标设计" },
+    { "id": "n7", "task": "定义手动偏好的结构化数据模型", "method": "为偏好键、值、作用域、条件、来源、版本、有效期和敏感级别设计可演化Schema" },
+    { "id": "n8", "task": "定义手动配置与短中长期记忆的冲突协议", "method": "建立基于来源权威性、作用域匹配度、显式程度、时间有效性和冲突状态的确定性优先级矩阵" },
+    { "id": "n9", "task": "设计手动偏好的端到端接入链路", "method": "规划配置管理入口到MemoryEngine写入、检索过滤、上下文注入和ConflictGroup更新的适配层" },
+    { "id": "n10", "task": "设计偏好配置与记忆冲突的验证方案", "method": "构造当前指令、临时偏好、中期候选、长期偏好和不同作用域手动配置之间的组合场景矩阵" },
+    { "id": "n11", "task": "制定手动偏好系统的分阶段上线方案", "method": "沿用现有绞杀式迁移策略，依次规划影子读取、双写审计、受控生效、迁移和回滚阶段" },
+    { "id": "n12", "task": "汇总Codex参考结论并推荐麒麟OS实施方案", "method": "区分官方文档事实、公开源码证据和不可验证推断后，形成架构决策与实施顺序", "acceptance": [{ "type": "evaluation", "criterion": "最终方案说明如何参考Codex处理手动配置与短期、中期、长期记忆之间的冲突" }] }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "order": 0 },
+    { "id": "e2", "source": "n1", "target": "n6", "order": 1 },
+    { "id": "e3", "source": "n1", "target": "n12", "order": 2 },
+    { "id": "e4", "source": "n2", "target": "n3", "order": 0 },
+    { "id": "e5", "source": "n2", "target": "n4", "order": 1 },
+    { "id": "e6", "source": "n2", "target": "n5", "order": 2 },
+    { "id": "e7", "source": "n6", "target": "n7", "order": 0 },
+    { "id": "e8", "source": "n6", "target": "n8", "order": 1 },
+    { "id": "e9", "source": "n6", "target": "n9", "order": 2 },
+    { "id": "e10", "source": "n6", "target": "n10", "order": 3 },
+    { "id": "e11", "source": "n6", "target": "n11", "order": 4 }
+  ]
+}

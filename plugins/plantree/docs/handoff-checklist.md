@@ -14,8 +14,8 @@
 - [ ] `GET http://127.0.0.1:4174/api/plan` 返回任务树。
 - [ ] `http://127.0.0.1:5174` 显示图形任务树。
 - [ ] 在启动终端按 `Ctrl+C` 后两个端口均释放。
-- [ ] `server/npm run build` 生成 `server/dist/index.js` 和 MCP UI 资源。
-- [ ] Codex 能加载 MCP 数据工具；PiP 人工验收单独记录。
+- [ ] `server/npm run build` 生成 `server/dist/index.js` 和侧栏 UI 资源。
+- [ ] Codex 能加载 MCP 数据工具并持续等待侧栏执行请求。
 
 ## 核心语义确认
 
@@ -25,7 +25,8 @@
 - [ ] MCP 与 Web 共享状态文件，但不共享撤销/重做栈。
 - [ ] `childIds` 决定树关系和顺序，`dependsOn` 表示显式依赖。
 - [ ] 前端视觉拖动不调用 `move_node`，不改变业务顺序。
-- [ ] 人工提示词是可选节点字段，自动提示词由前端纯函数派生。
+- [ ] UI 只编辑任务、方法和验收；图关系、状态和 ID 不进入可编辑正文。
+- [ ] 执行提示词只由节点结构化内容派生；没有显式验收时要求 Agent 自评。
 
 ## 按改动范围选择回归
 
@@ -38,7 +39,7 @@
 | 共享任务树类型 | 服务端测试、UI 测试、UI typecheck、旧示例 JSON 加载 |
 | 图模型或提示词纯函数 | 对应 UI 测试、UI typecheck |
 | React 交互 | `PlanTreeWindow` 测试、UI typecheck、Web 人工走查 |
-| MCP UI 构建 | UI `npm run build`、服务端 `npm run build`、Codex PiP 人工走查 |
+| 侧栏执行交接 | UI `npm run build`、服务端 `npm run build`、Codex 侧栏点击人工走查 |
 | 仅文档或 EditorConfig | 静态链接/名称检查、服务端 `npm test`、UI typecheck、OpenSpec validate |
 
 ## 交付前集中验证
@@ -60,21 +61,23 @@ openspec validate graph-interactive-plantree --strict
 - [ ] 不把图形自由连线映射为未定义的服务端关系。
 - [ ] 不新增 Graphviz、WASM、数据库、WebSocket、远程渲染或重型状态管理库。
 - [ ] 不将 `move_node` 用于前端视觉拖动。
-- [ ] 不在缺少宿主实测时宣称 Codex MCP PiP 验收完成。
+- [ ] 不在缺少真实侧栏点击实测时宣称自动执行验收完成。
 
 ## 当前交付状态
 
 - OpenSpec 变更：`graph-interactive-plantree`。
 - 当前进度：`25/26`。
-- 已完成：本地 Web 图形走查、UI/服务端自动化验证、类型检查、Web/MCP 构建、OpenSpec strict validate、人工提示词与重做能力。
-- 唯一待完成：`5.4 在 Codex MCP PiP 走查同一图形交互；若宿主未渲染小窗，验证数据工具仍能无 UI 地完成相同编辑流程。`
+- 已完成：本地 Web 图形走查、UI/服务端自动化验证、类型检查、侧栏构建、OpenSpec strict validate、结构化节点内容编辑与重做能力。
+- 唯一待完成：`5.4 在 Codex 中走查侧栏一次点击后自动进入完整剩余任务链。`
 
-### 5.4 人工验收记录
+### 5.4 侧栏执行人工验收记录
 
 - [ ] Codex MCP 服务成功加载。
-- [ ] `render_plan_tree` 显示 PiP，或已确认宿主不支持渲染但数据工具正常。
-- [ ] PiP 中节点、树边和显式依赖边正确显示。
-- [ ] PiP 中选择、提示词、编辑人工提示词、撤销和重做正常。
+- [ ] `render_plan_tree` 返回侧栏链接，并绑定创建任务树的 Codex `threadId`。
+- [ ] 侧栏中节点、树边和显式依赖边正确显示。
+- [ ] 侧栏中选择、查看/编辑任务、方法与验收、撤销和重做正常。
+- [ ] 用户点击前原 Codex 回合可以正常结束，无需长轮询。
+- [ ] 点击一次后原 Codex 对话出现新回合，自动领取首项并继续完整剩余任务链。
 - [ ] 写操作继续携带版本，冲突时刷新到服务端快照。
 - [ ] 验收后才在 `openspec/changes/graph-interactive-plantree/tasks.md` 勾选 5.4。
 

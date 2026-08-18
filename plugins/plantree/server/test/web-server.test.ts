@@ -13,6 +13,9 @@ describe("PlanTree Web 服务", () => {
       const response = await fetch(`${instance.url}/api/plan`);
       expect(response.status).toBe(200);
       expect((await response.json()).snapshot.id).toBe("demo-import-wizard-crash");
+      const page = await fetch(`${instance.url}/`);
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain('<div id="root"></div>');
     } finally {
       instance.server.close();
       await once(instance.server, "close");

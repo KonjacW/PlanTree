@@ -6,8 +6,13 @@ PlanTree 是一个本地单用户应用。服务端是任务树语义和持久�
 
 ```mermaid
 flowchart TD
-  Codex["Codex MCP PiP"] --> MCP["MCP stdio 适配层"]
+  Codex["创建任务树的 Codex 对话"] --> MCP["MCP stdio 适配层"]
   Browser["本地 Web"] --> HTTP["HTTP 适配层 :4174"]
+  Browser --> Request["版本化执行请求"]
+  MCP --> Binding["planId + threadId 对话绑定"]
+  Request --> Bridge["codex exec resume"]
+  Binding --> Bridge
+  Bridge --> Codex
   MCP --> SessionA["DemoSession（MCP 进程）"]
   HTTP --> SessionB["DemoSession（Web 进程）"]
   SessionA --> Store["PersistentPlanStore"]
@@ -28,6 +33,9 @@ flowchart TD
 - `plan-validation.ts`：结构校验和依赖同步。
 - `simulated-planner.ts`：编辑后的轻量模拟重规划。
 - `execution-simulator.ts`：可执行叶节点的模拟执行。
+- `planner-prompt.ts`：总目标到 TaskTree JSON 的 Codex 规划协议。
+- `task-tree.ts`：外部任务树校验及 `PlanSnapshot` 导入。
+- `execution-chain.ts`：跳过裁剪节点并按深度优先叶节点顺序生成执行提示词。
 - `impact-analysis.ts`：计算编辑影响范围。
 - `audit-log.ts`：追加领域审计记录。
 - `demo.ts`：初始演示任务树。
@@ -36,15 +44,15 @@ flowchart TD
 
 ### 应用层：`server/src/application`
 
-- `DemoSession` 组织读取、编辑、移动、模拟执行、撤销、重做和重置流程。
+- `DemoSession` 组织读取、导入、编辑、移动、执行链编译、真实开始/完成状态、兼容模拟执行、撤销、重做和重置流程。
 - `PersistentPlanStore` 负责文件读取、最低结构校验、版本比较和原子写入。
+- `ConversationBindingStore` 保存计划与创建它的 Codex 对话之间的绑定；`CodexConversationBridge` 只恢复该对话，不创建新对话。
 - 每次写入都由调用方提供 `expectedVersion`；版本不一致时抛出携带最新快照的 `PlanVersionConflictError`。
 
 ### MCP 适配层
 
 - `server/src/index.ts` 建立 `StdioServerTransport`。
-- `server/src/server.ts` 注册 MCP 工具和 PiP 资源，并将领域结果转换为 MCP `content` 与 `structuredContent`。
-- `server/src/ui-resource.ts` 提供构建后嵌入的 React UI 资源。
+- `server/src/server.ts` 注册 MCP 工具，并将领域结果转换为 MCP `content` 与 `structuredContent`。
 
 MCP 只使用本地 `stdio`，不启动 HTTP 监听器。
 
@@ -58,9 +66,10 @@ HTTP API 只监听回环地址，不提供远程访问或鉴权能力。
 
 ## UI 共享层
 
-- `ui/src/PlanTreeWindow.tsx` 是 Web 与 MCP PiP 共用的主 React 组件。
+- `ui/src/PlanTreeWindow.tsx` 是侧栏 Web 的主 React 组件。
 - `ui/src/http-tool-caller.ts` 将统一命令映射为 HTTP 请求。
-- MCP 入口通过宿主注入的工具调用器执行同名命令。
+- 侧栏点击执行时先编译当前执行链，再向 `/api/execution/request` 提交 `planId` 与 `snapshotVersion`。服务端校验计划绑定后，以参数数组调用 `codex exec resume <threadId> <prompt>`，在原对话启动执行回合；PlanTree 不注册内嵌任务树资源。
+- 节点内容、执行链和快捷键帮助在主窗口内共用互斥的内联工作区，并按需替换节点详情区域，不生成额外纵向层级或遮罩层；仅裁剪和放弃未保存修改使用阻断确认弹窗。
 - `ui/src/graph-model.ts` 是 `PlanSnapshot -> React Flow nodes/edges` 的纯适配层。
 - `ui/src/prompt.ts` 从当前快照纯函数派生自动提示词。
 - 节点会话坐标只保存在前端内存中；服务端快照更新后重新布局，并保留仍存在节点的坐标覆盖。

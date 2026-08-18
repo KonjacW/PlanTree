@@ -1,20 +1,25 @@
 {
   "name": "plantree",
-  "version": "0.1.0+codex.20260813181239",
-  "description": "Plantree plugin",
+  "version": "0.1.0+codex.20260818000628",
+  "description": "Plan, review, edit, and execute task trees inside Codex.",
   "author": {
     "name": "Local developer"
   },
   "skills": "./skills/",
   "interface": {
-    "displayName": "Plantree",
-    "shortDescription": "Use Plantree in Codex.",
-    "longDescription": "Plantree adds a local Codex plugin scaffold.",
+    "displayName": "PlanTree",
+    "shortDescription": "Review task trees in the Codex sidebar.",
+    "longDescription": "PlanTree turns a goal into an editable task tree, opens it in the Codex sidebar, and starts the approved execution chain with one click.",
     "developerName": "Local developer",
     "category": "Productivity",
-    "capabilities": [],
-    "defaultPrompt": "Help me use Plantree."
+    "capabilities": [
+      "Task planning",
+      "Sidebar task-tree review",
+      "Ordered execution"
+    ],
+    "defaultPrompt": [
+      "Use PlanTree to plan this goal as an editable task tree."
+    ]
   },
-  "mcpServers": "./.mcp.json",
-  "apps": "./.app.json"
+  "mcpServers": "./.mcp.json"
 }
