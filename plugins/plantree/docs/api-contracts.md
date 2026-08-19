@@ -33,8 +33,7 @@
 | `undo_last_edit` | `expectedVersion` | 是 | 撤销当前 MCP 进程最近一次可撤销操作。 |
 | `redo_last_edit` | `expectedVersion` | 是 | 重做当前 MCP 进程最近一次撤销。 |
 | `reset_demo` | `expectedVersion` | 是 | 写入初始演示内容并清空当前进程历史。 |
-| `render_plan_tree` | 可选 `snapshot` | 否 | 启动侧栏任务树，把计划绑定到当前 Codex `threadId`，并返回快照和侧栏链接。 |
-| `wait_for_execution_request` | `afterRequestId`、`timeoutSeconds` | 否 | 兼容旧客户端的执行请求轮询；正常流程不使用。 |
+| `render_plan_tree` | 可选 `snapshot` | 否 | 启动侧栏任务树，并返回快照和侧栏链接。 |
 
 ### `edit_node` 操作
 
@@ -65,7 +64,7 @@
 | `POST /api/planner/prompt` | `{ goal }` | 生成 TaskTree 规划提示词。 |
 | `POST /api/plan/import` | `{ tree, expectedVersion }` | `session.importTaskTree()` |
 | `POST /api/execution/chain` | `{}` | `session.compileExecutionChain()` |
-| `POST /api/execution/request` | `{ planId, snapshotVersion }` | 校验快照与对话绑定，写入递增请求，并在绑定的 Codex 对话启动执行回合。 |
+| `POST /api/execution/copy` | `{ planId, snapshotVersion }` | 校验快照，生成 `plantree-prompt.md`，并把文件对象复制到系统剪贴板。 |
 | `POST /api/execution/next` | `{ expectedVersion }` | `session.startNext()` |
 | `POST /api/execution/{nodeId}/complete` | `{ expectedVersion }` | `session.complete()` |
 | `POST /api/demo/load` | `{ expectedVersion }` | 当前实现与重置相同，调用 `session.reset()`。 |

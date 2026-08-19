@@ -50,7 +50,7 @@ npm --prefix plugins/plantree/server run build
 
 `.mcp.json` 使用 PATH 中的 `node`。启动代码先读取可选的 `PLANTREE_PLUGIN_ROOT`（测试/开发覆盖），再定位默认个人插件目录 `~/plugins/plantree`，因此可以从任意工作目录启动，也不依赖宿主展开 `${PLUGIN_ROOT}`。如果 Codex 无法找到 Node.js，先确认 `Get-Command node`，然后完全重启 Codex以重新读取 PATH。不要将个人机器的绝对 Node.js 路径提交到仓库。
 
-`render_plan_tree` 启动并返回绑定 `127.0.0.1:5174` 的侧栏入口，同时把计划绑定到调用元数据中的 Codex `threadId`。侧栏执行按钮向本地 API 提交版本化请求，本地桥接调用 `codex exec resume <threadId>`，让原对话的新回合直接进入执行链。项目不再注册 MCP App 或内嵌任务树资源。
+`render_plan_tree` 启动并返回绑定 `127.0.0.1:5174` 的侧栏入口。侧栏复制按钮向本地 API 提交计划 ID 与快照版本，服务端生成 `plantree-prompt.md` 并通过 Windows `FileDropList` 放入剪贴板。项目不注册 MCP App、内嵌任务树资源或对话恢复桥。
 
 首次安装仓库内的本地插件：
 
@@ -118,6 +118,7 @@ openspec validate graph-interactive-plantree --strict
 | `ui/src` | 是 | React UI、纯适配函数和 UI 测试。 |
 | `data/plantree-plan.example.json` | 是 | 可提交示例数据。 |
 | `data/plantree-plan.json` | 运行数据 | 本机任务树状态，已忽略。 |
+| `data/plantree-prompt.md` | 运行数据 | 最近一次复制的执行提示文件，已忽略。 |
 | `server/dist` | 可再生 | MCP 与 Web API JavaScript 构建；MCP 运行需要。 |
 | `ui/dist` | 可再生 | 侧栏 Web 构建产物。 |
 | `server/node_modules`、`ui/node_modules` | 可再生 | 独立依赖目录。 |

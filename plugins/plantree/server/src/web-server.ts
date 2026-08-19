@@ -7,15 +7,13 @@ import { extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DemoSession } from "./application/demo-session.js";
-import { CodexConversationBridge } from "./application/codex-conversation-bridge.js";
-import { ConversationBindingStore } from "./application/conversation-binding-store.js";
-import { ExecutionRequestStore } from "./application/execution-request-store.js";
+import { PromptFileClipboard } from "./application/prompt-file-clipboard.js";
 import { createWebApi } from "./web-api.js";
 
 export type WebServerInstance = { server: Server; url: string };
 
-export async function startWebServer(port = 4174, session = new DemoSession(), executionRequests = new ExecutionRequestStore(), conversationBindings = new ConversationBindingStore(), conversationBridge = new CodexConversationBridge()): Promise<WebServerInstance> {
-  const api = createWebApi(session, executionRequests, conversationBindings, conversationBridge);
+export async function startWebServer(port = 4174, session = new DemoSession(), promptClipboard = new PromptFileClipboard()): Promise<WebServerInstance> {
+  const api = createWebApi(session, promptClipboard);
   const uiDirectory = fileURLToPath(new URL("../../ui/dist/", import.meta.url));
   const server = createServer((request, response) => {
     const url = request.url ?? "/";

@@ -2,9 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { createOrLoadDemo, DemoSession } from "./application/demo-session.js";
-import { CodexConversationBridge } from "./application/codex-conversation-bridge.js";
-import { ConversationBindingStore } from "./application/conversation-binding-store.js";
-import { ExecutionRequestStore } from "./application/execution-request-store.js";
 import { PlanVersionConflictError } from "./application/persistent-plan-store.js";
 import { buildPlannerPrompt } from "./domain/planner-prompt.js";
 import type { EditCommand } from "./domain/plan-editor.js";
@@ -19,14 +16,7 @@ export const executionToolOutputSchema = planToolOutputSchema.extend({
   done: z.boolean().optional(),
 });
 export const plannerPromptOutputSchema = z.object({ summary: z.string(), plannerPrompt: z.string() });
-export const sidebarToolOutputSchema = planToolOutputSchema.extend({ url: z.string().url(), requestId: z.number().int().nonnegative() });
-export const executionRequestOutputSchema = z.object({
-  summary: z.string(),
-  requested: z.boolean(),
-  requestId: z.number().int().nonnegative(),
-  planId: z.string().optional(),
-  snapshotVersion: z.number().int().nonnegative().optional(),
-});
+export const sidebarToolOutputSchema = planToolOutputSchema.extend({ url: z.string().url() });
 const acceptanceSchema = z.object({ type: z.enum(["test", "metric", "evaluation"]), criterion: z.string().min(1) });
 const taskTreeSchema = z.object({
   schemaVersion: z.literal("1.0"),
@@ -46,14 +36,11 @@ const editableNodeSchema = z.object({
 });
 export const serverMetadata = { name: "plantree-mcp", version: "0.1.0", transport: "stdio" } as const;
 
-type SidebarOpener = (session: DemoSession, requestStore: ExecutionRequestStore, bindingStore: ConversationBindingStore, bridge: CodexConversationBridge) => Promise<string>;
+type SidebarOpener = (session: DemoSession) => Promise<string>;
 
 export function createPlanTreeServer(
   session = new DemoSession(),
-  executionRequests = new ExecutionRequestStore(),
   openSidebar: SidebarOpener = ensurePlanTreeSidebar,
-  conversationBindings = new ConversationBindingStore(),
-  conversationBridge = new CodexConversationBridge(),
 ): McpServer {
   const server = new McpServer({ name: serverMetadata.name, version: serverMetadata.version });
   server.registerTool("build_planner_prompt", { description: "根据用户总目标生成 TaskTree JSON 规划提示词。", inputSchema: { goal: z.string().min(1) }, outputSchema: plannerPromptOutputSchema }, ({ goal }) => plannerPromptToolResponse(goal));
@@ -68,8 +55,7 @@ export function createPlanTreeServer(
   server.registerTool("undo_last_edit", { description: "撤销最近一次编辑。", inputSchema: { expectedVersion: z.number().int().nonnegative() }, outputSchema: planToolOutputSchema }, ({ expectedVersion }) => undoDemoToolResponse(session, expectedVersion));
   server.registerTool("redo_last_edit", { description: "重做最近一次被撤销的编辑。", inputSchema: { expectedVersion: z.number().int().nonnegative() }, outputSchema: planToolOutputSchema }, ({ expectedVersion }) => redoDemoToolResponse(session, expectedVersion));
   server.registerTool("reset_demo", { description: "重置 PlanTree 演示会话。", inputSchema: { expectedVersion: z.number().int().nonnegative() }, outputSchema: planToolOutputSchema }, ({ expectedVersion }) => resetDemoToolResponse(session, expectedVersion));
-  server.registerTool("render_plan_tree", { description: "启动 PlanTree 侧栏任务树，并把计划绑定到当前 Codex 对话；用户点击执行后会在同一对话启动新回合。", inputSchema: { snapshot: z.record(z.string(), z.unknown()).optional() }, outputSchema: sidebarToolOutputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true } }, (_input, extra) => renderPlanTreeToolResponse(session, executionRequests, conversationBindings, conversationBridge, extra, openSidebar));
-  server.registerTool("wait_for_execution_request", { description: "兼容旧客户端：等待侧栏提交执行请求。正常流程由按钮自动恢复原 Codex 对话，无需调用本工具。", inputSchema: { afterRequestId: z.number().int().nonnegative(), timeoutSeconds: z.number().int().min(1).max(55).default(55) }, outputSchema: executionRequestOutputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } }, ({ afterRequestId, timeoutSeconds }) => waitForExecutionRequestToolResponse(executionRequests, afterRequestId, timeoutSeconds));
+  server.registerTool("render_plan_tree", { description: "启动 PlanTree 侧栏任务树；用户确认后可把剩余执行链复制为 plantree-prompt.md 文件。", inputSchema: { snapshot: z.record(z.string(), z.unknown()).optional() }, outputSchema: sidebarToolOutputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true } }, () => renderPlanTreeToolResponse(session, openSidebar));
   return server;
 }
 
@@ -81,54 +67,18 @@ export async function resetDemoToolResponse(session: DemoSession, expectedVersio
 export async function simulateDemoToolResponse(session: DemoSession, nodeId: string, expectedVersion: number) { return dataToolResponse(session.simulate(nodeId, expectedVersion)); }
 export async function renderPlanTreeToolResponse(
   session: DemoSession,
-  executionRequests: ExecutionRequestStore,
-  conversationBindings: ConversationBindingStore,
-  conversationBridge: CodexConversationBridge,
-  requestContext: unknown,
   openSidebar: SidebarOpener = ensurePlanTreeSidebar,
 ) {
   const { snapshot } = await session.read();
-  const binding = extractConversationBinding(requestContext);
-  if (!binding) throw new Error("Codex 未向 PlanTree 提供当前对话标识，无法保证执行回复进入正确对话。");
-  await conversationBindings.bind(snapshot.id, binding.threadId, binding.cwd);
-  const [request, url] = await Promise.all([
-    executionRequests.read(),
-    openSidebar(session, executionRequests, conversationBindings, conversationBridge),
-  ]);
-  const summary = "PlanTree 本地 UI 已启动并绑定当前 Codex 对话；请编辑任务树，确认后点击开始自动执行。";
+  const url = await openSidebar(session);
+  const summary = "PlanTree 本地 UI 已启动；请编辑任务树，确认后点击复制执行文件。";
   return {
     content: [
       { type: "text" as const, text: summary },
       { type: "resource_link" as const, name: "打开 PlanTree 交互任务树", uri: url, description: "在 Codex 侧栏查看、编辑并确认任务树。", mimeType: "text/html" },
     ],
-    structuredContent: { snapshot, summary, url, requestId: request.requestId },
+    structuredContent: { snapshot, summary, url },
   };
-}
-
-export function extractConversationBinding(requestContext: unknown): { threadId: string; cwd: string } | undefined {
-  if (typeof requestContext !== "object" || requestContext === null) return undefined;
-  const context = requestContext as Record<string, unknown>;
-  const meta = typeof context._meta === "object" && context._meta !== null ? context._meta as Record<string, unknown> : {};
-  const turnMeta = typeof meta["x-codex-turn-metadata"] === "object" && meta["x-codex-turn-metadata"] !== null
-    ? meta["x-codex-turn-metadata"] as Record<string, unknown>
-    : {};
-  const threadId = firstNonemptyString(meta.threadId, meta.thread_id, turnMeta.thread_id, turnMeta.threadId);
-  if (!threadId) return undefined;
-  return { threadId, cwd: firstNonemptyString(turnMeta.cwd, meta.cwd) ?? process.cwd() };
-}
-
-function firstNonemptyString(...values: unknown[]): string | undefined {
-  return values.find((value): value is string => typeof value === "string" && Boolean(value.trim()))?.trim();
-}
-
-export async function waitForExecutionRequestToolResponse(executionRequests: ExecutionRequestStore, afterRequestId: number, timeoutSeconds: number) {
-  const request = await executionRequests.waitAfter(afterRequestId, timeoutSeconds);
-  if (!request) {
-    const summary = "尚未收到侧栏的自动执行请求。";
-    return { content: [{ type: "text" as const, text: summary }], structuredContent: { summary, requested: false, requestId: afterRequestId } };
-  }
-  const summary = `已收到计划“${request.planId}”的自动执行请求。`;
-  return { content: [{ type: "text" as const, text: summary }], structuredContent: { summary, requested: true, requestId: request.requestId, planId: request.planId, snapshotVersion: request.snapshotVersion } };
 }
 
 export function plannerPromptToolResponse(goal: string) {

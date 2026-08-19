@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildCodexExecutionMessage, createAppMessageSender, createAppToolCaller, getFittedPreviewViewport, getPreviewControlViewport, getPreviewViewport, getPreviewWheelViewport, PlanTreeWindow, previewInteractionProps } from "./PlanTreeWindow";
+import { createAppToolCaller, getFittedPreviewViewport, getPreviewControlViewport, getPreviewViewport, getPreviewWheelViewport, PlanTreeWindow, previewInteractionProps } from "./PlanTreeWindow";
 
 const snapshot = {
   id: "plan", version: 1, rootNodeId: "root",
@@ -28,38 +28,6 @@ describe("PlanTreeWindow", () => {
       message: "任务树已被其他入口更新，请刷新后重试。",
       snapshot: expect.objectContaining({ version: 2 }),
     }));
-  });
-
-  it("MCP bridge 先写入完整执行链上下文，再把执行指令作为用户消息交给 Codex", async () => {
-    const chain = { schemaVersion: "1.0" as const, chainId: "chain", sourceTreeId: "plan", traversal: "depth-first-leaves" as const, taskCount: 1, tasks: [{ sequence: 1, nodeId: "third", status: "pending" as const, parentTasks: [], childTasks: [], prompt: "第三项" }] };
-    const app = {
-      getHostCapabilities: vi.fn().mockReturnValue({ message: { text: {} }, updateModelContext: { text: {}, structuredContent: {} } }),
-      updateModelContext: vi.fn().mockResolvedValue({}),
-      sendMessage: vi.fn().mockResolvedValue({}),
-    };
-    await createAppMessageSender(app)({ message: "执行已确认队列", snapshot, chain });
-    expect(app.updateModelContext).toHaveBeenCalledWith(expect.objectContaining({ structuredContent: { planTreeExecution: expect.objectContaining({ planId: "plan", snapshotVersion: 1, chain }) } }));
-    expect(app.sendMessage).toHaveBeenCalledWith({ role: "user", content: [{ type: "text", text: "执行已确认队列" }] });
-    expect(app.updateModelContext.mock.invocationCallOrder[0]).toBeLessThan(app.sendMessage.mock.invocationCallOrder[0]);
-  });
-
-  it("没有执行请求发送器时明确拒绝自动执行", async () => {
-    const chain = { schemaVersion: "1.0" as const, chainId: "chain", sourceTreeId: "plan", traversal: "depth-first-leaves" as const, taskCount: 0, tasks: [] };
-    const app = { getHostCapabilities: vi.fn().mockReturnValue({}), sendMessage: vi.fn().mockResolvedValue({}) };
-    await expect(createAppMessageSender(app)({ message: "执行", snapshot, chain })).rejects.toThrow("不支持从 PlanTree 启动自动执行");
-    expect(app.sendMessage).not.toHaveBeenCalled();
-  });
-
-  it("自动执行消息规定真实执行、验收和停止条件", () => {
-    const chain = { schemaVersion: "1.0" as const, chainId: "chain", sourceTreeId: "plan", traversal: "depth-first-leaves" as const, taskCount: 2, tasks: [
-      { sequence: 1, nodeId: "first", status: "completed" as const, parentTasks: [], childTasks: [], prompt: "第一项" },
-      { sequence: 2, nodeId: "third", status: "pending" as const, parentTasks: [], childTasks: [], prompt: "第三项" },
-    ] };
-    const message = buildCodexExecutionMessage(snapshot, chain);
-    expect(message).toContain("确认的剩余顺序：third");
-    expect(message).toContain("不要调用 simulate_execution");
-    expect(message).toContain("只有任务确实完成且验收通过后");
-    expect(message).toContain("保留当前节点为 in_progress");
   });
 
   it("仅用 Ctrl+Shift+左键框选，普通左键和右键用于平移", () => {
@@ -119,16 +87,16 @@ describe("PlanTreeWindow", () => {
     expect(screen.getByText("树关系")).toBeVisible();
     expect(screen.getByText("前置依赖")).toBeVisible();
     expect(screen.getByText("当前节点详情")).toBeVisible();
-    expect(screen.getByRole("button", { name: "开始自动执行" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "复制执行文件" })).toBeVisible();
     expect(screen.getByRole("button", { name: "P 节点内容" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Delete 删除" })).toBeVisible();
     expect(screen.getByLabelText(/^第二项/)).toBeInTheDocument();
   });
 
-  it("Web 侧栏占满视口并允许提交执行请求", () => {
-    render(<PlanTreeWindow plan={snapshot} toolCaller={vi.fn()} messageSender={vi.fn()} webMode />);
+  it("Web 侧栏占满视口并允许复制提示文件", () => {
+    render(<PlanTreeWindow plan={snapshot} toolCaller={vi.fn()} promptFileCopier={vi.fn()} webMode />);
     expect(screen.getByLabelText("PlanTree 任务图预览")).toHaveClass("plantree-preview-web");
-    expect(screen.getByRole("button", { name: "开始自动执行" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "复制执行文件" })).toBeEnabled();
   });
 
   it("为自定义节点提供初始尺寸，使其不依赖异步测量即可显示", () => {
@@ -151,34 +119,33 @@ describe("PlanTreeWindow", () => {
     fireEvent.keyDown(screen.getByLabelText("PlanTree 任务树"), { key: "p" }); expect(screen.queryByRole("region", { name: "节点内容" })).not.toBeInTheDocument();
   });
 
-  it("Enter 一次启动完整自动执行，撤销仍携带当前 expectedVersion", async () => {
+  it("Enter 一次复制完整执行提示，撤销仍携带当前 expectedVersion", async () => {
     const chain = { schemaVersion: "1.0", chainId: "chain", sourceTreeId: "plan", traversal: "depth-first-leaves", taskCount: 1, tasks: [{ sequence: 1, nodeId: "third", status: "pending", parentTasks: [], childTasks: [], prompt: "执行第三项" }] };
-    const caller = vi.fn().mockResolvedValue({ snapshot, chain, summary: "已更新" }); const messageSender = vi.fn().mockResolvedValue(undefined); render(<PlanTreeWindow plan={snapshot} toolCaller={caller} messageSender={messageSender} />); selectNode("第三项");
+    const caller = vi.fn().mockResolvedValue({ snapshot, chain, summary: "已更新" }); const promptFileCopier = vi.fn().mockResolvedValue({ fileName: "plantree-prompt.md" }); render(<PlanTreeWindow plan={snapshot} toolCaller={caller} promptFileCopier={promptFileCopier} />); selectNode("第三项");
     fireEvent.keyDown(screen.getByLabelText("PlanTree 任务树"), { key: "Enter" });
     await waitFor(() => expect(caller).toHaveBeenCalledWith("compile_execution_chain", {}));
-    await waitFor(() => expect(messageSender).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("确认的剩余顺序：third"), snapshot, chain })));
+    await waitFor(() => expect(promptFileCopier).toHaveBeenCalledWith({ snapshot, chain }));
     expect(caller).not.toHaveBeenCalledWith("start_next_task", expect.anything());
     fireEvent.keyDown(screen.getByLabelText("PlanTree 任务树"), { key: "Escape" });
     fireEvent.keyDown(screen.getByLabelText("PlanTree 任务树"), { key: "z", ctrlKey: true }); await waitFor(() => expect(caller).toHaveBeenCalledWith("undo_last_edit", { expectedVersion: 1 }));
   });
 
-  it("一次点击把当前剩余执行链发送给 Codex，无需复制提示词", async () => {
+  it("一次点击把当前剩余执行链复制为提示文件", async () => {
     const chain = { schemaVersion: "1.0", chainId: "chain", sourceTreeId: "plan", traversal: "depth-first-leaves", taskCount: 2, tasks: [
       { sequence: 1, nodeId: "first", status: "completed", parentTasks: [], childTasks: [], prompt: "第一项" },
       { sequence: 2, nodeId: "third", status: "pending", parentTasks: [], childTasks: [], prompt: "第三项" },
     ] };
     const caller = vi.fn().mockResolvedValue({ snapshot, chain, summary: "已编译" });
-    const messageSender = vi.fn().mockResolvedValue(undefined);
-    render(<PlanTreeWindow plan={snapshot} toolCaller={caller} messageSender={messageSender} />);
-    fireEvent.click(screen.getByRole("button", { name: "开始自动执行" }));
+    const promptFileCopier = vi.fn().mockResolvedValue({ fileName: "plantree-prompt.md" });
+    render(<PlanTreeWindow plan={snapshot} toolCaller={caller} promptFileCopier={promptFileCopier} />);
+    fireEvent.click(screen.getByRole("button", { name: "复制执行文件" }));
     await waitFor(() => expect(caller).toHaveBeenCalledWith("compile_execution_chain", {}));
-    await waitFor(() => expect(messageSender).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("确认的剩余顺序：third"), snapshot, chain })));
-    expect(screen.getByRole("status")).toHaveTextContent("已在原 Codex 对话启动执行；将依次处理 1 个剩余任务");
+    await waitFor(() => expect(promptFileCopier).toHaveBeenCalledWith({ snapshot, chain }));
+    expect(screen.getByRole("status")).toHaveTextContent("已将 plantree-prompt.md 文件复制到剪贴板");
     fireEvent.click(screen.getByRole("button", { name: "查看执行链" }));
     await waitFor(() => expect(screen.getByRole("region", { name: "执行链" })).toBeVisible());
-    expect(screen.queryByRole("button", { name: "复制" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "确认当前任务已完成" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "开始自动执行剩余任务" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "复制剩余任务文件" })).toBeVisible();
   });
 
   it("Delete 先确认，逐项失败后停止", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createHttpMessageSender, createHttpToolCaller, PlanVersionConflictClientError } from "./http-tool-caller";
+import { createHttpPromptFileCopier, createHttpToolCaller, PlanVersionConflictClientError } from "./http-tool-caller";
 
 describe("HTTP 工具调用适配器", () => {
   it("将展开命令发送给编辑 API", async () => {
@@ -60,13 +60,13 @@ describe("HTTP 工具调用适配器", () => {
     ]);
   });
 
-  it("从侧栏一次点击提交兼容执行请求", async () => {
-    const fetchStub = vi.fn().mockResolvedValue(new Response(JSON.stringify({ request: { requestId: 1 } }), { status: 200 }));
-    const sender = createHttpMessageSender("", fetchStub);
+  it("从侧栏一次点击请求复制提示文件", async () => {
+    const fetchStub = vi.fn().mockResolvedValue(new Response(JSON.stringify({ copied: { fileName: "plantree-prompt.md" } }), { status: 200 }));
+    const copier = createHttpPromptFileCopier("", fetchStub);
 
-    await sender({ message: "执行", snapshot: { id: "plan", version: 7 } as never, chain: {} as never });
+    await expect(copier({ snapshot: { id: "plan", version: 7 } as never, chain: {} as never })).resolves.toEqual({ fileName: "plantree-prompt.md" });
 
-    expect(fetchStub).toHaveBeenCalledWith("/api/execution/request", expect.objectContaining({ method: "POST", body: JSON.stringify({ planId: "plan", snapshotVersion: 7 }) }));
+    expect(fetchStub).toHaveBeenCalledWith("/api/execution/copy", expect.objectContaining({ method: "POST", body: JSON.stringify({ planId: "plan", snapshotVersion: 7 }) }));
   });
 
   it("将同级排序映射到本机移动接口", async () => {

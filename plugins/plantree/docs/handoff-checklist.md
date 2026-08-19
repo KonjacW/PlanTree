@@ -15,7 +15,7 @@
 - [ ] `http://127.0.0.1:5174` 显示图形任务树。
 - [ ] 在启动终端按 `Ctrl+C` 后两个端口均释放。
 - [ ] `server/npm run build` 生成 `server/dist/index.js` 和侧栏 UI 资源。
-- [ ] Codex 能加载 MCP 数据工具并持续等待侧栏执行请求。
+- [ ] Codex 能加载 MCP 数据工具，侧栏无需等待 Codex 回合。
 
 ## 核心语义确认
 
@@ -39,7 +39,7 @@
 | 共享任务树类型 | 服务端测试、UI 测试、UI typecheck、旧示例 JSON 加载 |
 | 图模型或提示词纯函数 | 对应 UI 测试、UI typecheck |
 | React 交互 | `PlanTreeWindow` 测试、UI typecheck、Web 人工走查 |
-| 侧栏执行交接 | UI `npm run build`、服务端 `npm run build`、Codex 侧栏点击人工走查 |
+| 侧栏提示文件交接 | UI `npm run build`、服务端 `npm run build`、剪贴板文件粘贴人工走查 |
 | 仅文档或 EditorConfig | 静态链接/名称检查、服务端 `npm test`、UI typecheck、OpenSpec validate |
 
 ## 交付前集中验证
@@ -61,7 +61,7 @@ openspec validate graph-interactive-plantree --strict
 - [ ] 不把图形自由连线映射为未定义的服务端关系。
 - [ ] 不新增 Graphviz、WASM、数据库、WebSocket、远程渲染或重型状态管理库。
 - [ ] 不将 `move_node` 用于前端视觉拖动。
-- [ ] 不在缺少真实侧栏点击实测时宣称自动执行验收完成。
+- [ ] 不在缺少真实侧栏点击和文件粘贴实测时宣称交接验收完成。
 
 ## 当前交付状态
 
@@ -73,11 +73,11 @@ openspec validate graph-interactive-plantree --strict
 ### 5.4 侧栏执行人工验收记录
 
 - [ ] Codex MCP 服务成功加载。
-- [ ] `render_plan_tree` 返回侧栏链接，并绑定创建任务树的 Codex `threadId`。
+- [ ] `render_plan_tree` 返回侧栏链接，不依赖 Codex 对话标识。
 - [ ] 侧栏中节点、树边和显式依赖边正确显示。
 - [ ] 侧栏中选择、查看/编辑任务、方法与验收、撤销和重做正常。
-- [ ] 用户点击前原 Codex 回合可以正常结束，无需长轮询。
-- [ ] 点击一次后原 Codex 对话出现新回合，自动领取首项并继续完整剩余任务链。
+- [ ] 点击“复制执行文件”后生成 `plantree-prompt.md`。
+- [ ] 剪贴板中是可粘贴的文件对象；粘贴到目标 Codex 对话后包含完整剩余任务链。
 - [ ] 写操作继续携带版本，冲突时刷新到服务端快照。
 - [ ] 验收后才在 `openspec/changes/graph-interactive-plantree/tasks.md` 勾选 5.4。
 

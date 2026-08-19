@@ -1,9 +1,7 @@
 import type { Server } from "node:http";
 
 import type { DemoSession } from "./application/demo-session.js";
-import type { CodexConversationBridge } from "./application/codex-conversation-bridge.js";
-import type { ConversationBindingStore } from "./application/conversation-binding-store.js";
-import type { ExecutionRequestStore } from "./application/execution-request-store.js";
+import type { PromptFileClipboard } from "./application/prompt-file-clipboard.js";
 import { PLANTREE_RUNTIME_VERSION } from "./runtime-version.js";
 import { startWebServer } from "./web-server.js";
 
@@ -12,7 +10,7 @@ export const PLAN_TREE_SIDEBAR_URL = "http://127.0.0.1:5174";
 let sidebarServer: Server | undefined;
 let sidebarUrl: string | undefined;
 
-export async function ensurePlanTreeSidebar(session: DemoSession, requestStore: ExecutionRequestStore, bindingStore: ConversationBindingStore, bridge: CodexConversationBridge, preferredPort = 5174): Promise<string> {
+export async function ensurePlanTreeSidebar(session: DemoSession, promptClipboard?: PromptFileClipboard, preferredPort = 5174): Promise<string> {
   const preferredUrl = `http://127.0.0.1:${preferredPort}`;
   if (sidebarUrl && await isHealthy(sidebarUrl)) return sidebarUrl;
   if (await isHealthy(preferredUrl)) {
@@ -20,7 +18,7 @@ export async function ensurePlanTreeSidebar(session: DemoSession, requestStore: 
     return sidebarUrl;
   }
   try {
-    const instance = await startWebServer(preferredPort, session, requestStore, bindingStore, bridge);
+    const instance = await startWebServer(preferredPort, session, promptClipboard);
     sidebarServer = instance.server;
     sidebarUrl = instance.url;
     return sidebarUrl;
@@ -33,7 +31,7 @@ export async function ensurePlanTreeSidebar(session: DemoSession, requestStore: 
 
     // An older PlanTree process may still own 5174 after a plugin update. Do
     // not reuse it and do not kill it; serve the current build on a free port.
-    const instance = await startWebServer(0, session, requestStore, bindingStore, bridge);
+    const instance = await startWebServer(0, session, promptClipboard);
     sidebarServer = instance.server;
     sidebarUrl = instance.url;
     return sidebarUrl;

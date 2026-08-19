@@ -95,7 +95,7 @@ npm --prefix plugins/plantree/server run build
 
 这是当前会话级设计，不是数据丢失。任务树本身仍在状态文件中。
 
-## 侧栏正常但点击后 Codex 没有执行
+## 侧栏正常但点击后没有可粘贴文件
 
 **检查顺序**：
 
@@ -103,13 +103,13 @@ npm --prefix plugins/plantree/server run build
 2. 在 PowerShell 中执行 `Get-Command node`，确认 Node.js 已加入 PATH；完全重启 Codex 以重新读取环境变量。
 3. 核对 Codex 加载的是当前插件目录，而不是旧缓存版本。
 4. 通过数据工具读取或编辑任务树，确认 MCP stdio 服务本身是否正常。
-5. 在创建任务树的 Codex 对话中重新调用 `render_plan_tree`，确认已写入 `data/conversation-binding.json`。
-6. 确认 `%LOCALAPPDATA%\OpenAI\Codex\bin\*\codex.exe` 存在；需要覆盖路径时设置 `PLANTREE_CODEX_PATH`。
-7. 点击侧栏“开始自动执行”，检查返回提示是否为“已在原 Codex 对话启动执行”，并确认该对话出现新回合。
+5. 点击“复制执行文件”，确认页面显示“已将 plantree-prompt.md 文件复制到剪贴板”。
+6. 在文件资源管理器或 Codex 输入框粘贴，确认得到文件而不是一段纯文本。
+7. 检查 `data/plantree-prompt.md` 是否已生成；若生成但无法粘贴，检查 Windows 剪贴板或 PowerShell 的 `System.Windows.Forms` 可用性。
 
 当前启动器不再使用 `${PLUGIN_ROOT}` 字面路径；日志中若仍出现该字符串，说明 Codex 还在加载旧插件缓存，需重新安装插件并在新任务中验证。
 
-PlanTree 永久不提供内嵌任务树。正常流程不要求原 Codex 回合保持运行；侧栏请求会恢复创建该树的原对话。若绑定缺失或计划 ID 不匹配，服务端会拒绝启动，以免回复进入错误对话。
+PlanTree 永久不提供内嵌任务树，也不自动恢复或选择 Codex 对话。用户决定把复制出的文件粘贴到哪个对话。
 
 ## 构建出现 `use client` ignored 警告
 

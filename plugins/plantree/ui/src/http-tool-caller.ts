@@ -1,5 +1,4 @@
-import type { ToolCaller } from "./PlanTreeWindow";
-import type { MessageSender } from "./PlanTreeWindow";
+import type { PromptFileCopier, ToolCaller } from "./PlanTreeWindow";
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -18,11 +17,12 @@ export function createHttpToolCaller(baseUrl: string, fetcher: FetchLike = fetch
   };
 }
 
-export function createHttpMessageSender(baseUrl: string, fetcher: FetchLike = fetch): MessageSender {
+export function createHttpPromptFileCopier(baseUrl: string, fetcher: FetchLike = fetch): PromptFileCopier {
   return async ({ snapshot }) => {
-    const response = await fetcher(`${baseUrl}/api/execution/request`, post("/api/execution/request", { planId: snapshot.id, snapshotVersion: snapshot.version }).init);
-    const body = await response.json() as { error?: string };
-    if (!response.ok) throw new Error(body.error ?? "无法通知 Codex 开始自动执行。");
+    const response = await fetcher(`${baseUrl}/api/execution/copy`, post("/api/execution/copy", { planId: snapshot.id, snapshotVersion: snapshot.version }).init);
+    const body = await response.json() as { error?: string; copied?: { fileName?: string } };
+    if (!response.ok) throw new Error(body.error ?? "无法复制执行提示文件。");
+    return { fileName: body.copied?.fileName ?? "plantree-prompt.md" };
   };
 }
 

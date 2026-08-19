@@ -1,7 +1,7 @@
 {
   "name": "plantree",
-  "version": "0.1.0+codex.20260818000628",
-  "description": "Plan, review, edit, and execute task trees inside Codex.",
+  "version": "0.1.0+codex.20260819192850",
+  "description": "Plan, review, edit, and copy task-tree execution prompts into Codex.",
   "author": {
     "name": "Local developer"
   },
@@ -9,13 +9,13 @@
   "interface": {
     "displayName": "PlanTree",
     "shortDescription": "Review task trees in the Codex sidebar.",
-    "longDescription": "PlanTree turns a goal into an editable task tree, opens it in the Codex sidebar, and starts the approved execution chain with one click.",
+    "longDescription": "PlanTree turns a goal into an editable task tree and copies the approved execution chain as a Markdown file for any Codex conversation.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
       "Task planning",
       "Sidebar task-tree review",
-      "Ordered execution"
+      "Markdown execution handoff"
     ],
     "defaultPrompt": [
       "Use PlanTree to plan this goal as an editable task tree."

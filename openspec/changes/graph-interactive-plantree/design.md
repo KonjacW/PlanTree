@@ -2,7 +2,7 @@
 
 Plantree 通过同一份版本化 JSON 状态文件向 MCP 数据工具和本地侧栏 Web 提供计划快照。现有 `PlanTreeWindow` 使用层级列表展示节点，并在组件中维护选择、框选和键盘焦点。该形式无法将树层级与 `dependsOn` 依赖同时可视化，也没有针对节点规划提示词的阅读入口。
 
-本变更重做前端呈现、本地交互和执行交接层。它必须继续经现有 MCP/HTTP `ToolCaller` 调用变更命令、由服务端保持权威快照与 `expectedVersion` 冲突保护，并在 Codex 侧栏的有限宽高内工作。产品永久放弃内嵌任务树；侧栏执行按钮通过版本化请求交给当前仍在等待的 Codex 回合。用户明确不需要 `F` 聚焦快捷键，也不需要原生桌面拖放、跨窗口文件输入、自由创建连线或全屏工作台。
+本变更重做前端呈现、本地交互和执行交接层。它必须继续经现有 MCP/HTTP `ToolCaller` 调用变更命令、由服务端保持权威快照与 `expectedVersion` 冲突保护，并在 Codex 侧栏的有限宽高内工作。产品永久放弃内嵌任务树和内部对话传输；侧栏复制按钮通过版本化请求生成 Markdown 文件对象并放入系统剪贴板。用户明确不需要 `F` 聚焦快捷键，也不需要自由创建连线或全屏工作台。
 
 ## Goals / Non-Goals
 
@@ -67,7 +67,7 @@ React Flow 的空白画布拖拽框选是主选择机制。单击选中一个节
 
 ### 6. 侧栏编辑与 Codex 等待交接
 
-`PlanTreeWindow` 或其替换组件继续接收现有 `plan` 与 `toolCaller`，并在所有变更调用中注入 `expectedVersion`。HTTP 409 和 MCP 冲突继续采用服务端最新快照刷新画布、保留仍存在的选择和局部视觉位置。`render_plan_tree` 记录当前 Codex `threadId`；执行按钮提交 `planId` 与 `snapshotVersion` 后，服务端通过 `codex exec resume` 恢复原对话并调用 `start_next_task`。不注册 MCP App 或内嵌任务树资源。
+`PlanTreeWindow` 或其替换组件继续接收现有 `plan` 与 `toolCaller`，并在所有变更调用中注入 `expectedVersion`。HTTP 409 和 MCP 冲突继续采用服务端最新快照刷新画布、保留仍存在的选择和局部视觉位置。复制按钮提交 `planId` 与 `snapshotVersion` 后，服务端生成包含完整剩余任务提示的 `plantree-prompt.md`，并通过 Windows `FileDropList` 写入剪贴板。不注册 MCP App、内嵌任务树资源或对话恢复桥。
 
 ### 7. 轻量实现与集中监测点测试
 
@@ -96,7 +96,7 @@ React Flow 的空白画布拖拽框选是主选择机制。单击选中一个节
 
 1. 新增依赖、图模型和单元测试，但保留现有 `ToolCaller`、数据协议和列表实现直到图形组件测试通过。
 2. 用图形组件替换主展示区域，将现有详情/反馈迁移为抽屉、操作条和轻量控制栏。
-3. 验证侧栏 Web 一次点击后通过记录的 `threadId` 恢复原 Codex 对话；发生问题时保留 MCP 数据工具，不回退到内嵌任务树。
+3. 验证侧栏 Web 一次点击后可在目标 Codex 对话粘贴 `plantree-prompt.md`；发生问题时保留 MCP 数据工具，不回退到内嵌任务树或内部传输。
 4. 仅在组件、快捷键、版本冲突和生产构建验证通过后移除不再使用的列表树样式与测试。
 
 ## Open Questions

@@ -1,21 +1,18 @@
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { DemoSession } from "../src/application/demo-session.js";
-import { CodexConversationBridge } from "../src/application/codex-conversation-bridge.js";
-import { ConversationBindingStore } from "../src/application/conversation-binding-store.js";
-import { ExecutionRequestStore } from "../src/application/execution-request-store.js";
 import { PersistentPlanStore } from "../src/application/persistent-plan-store.js";
+import { PromptFileClipboard } from "../src/application/prompt-file-clipboard.js";
 import { PLANTREE_RUNTIME_VERSION } from "../src/runtime-version.js";
 import { createWebApi } from "../src/web-api.js";
 
 describe("PlanTree Web API", () => {
   let server: ReturnType<typeof createServer> | undefined; let directory: string | undefined;
-  const launched: Array<{ command: string; args: readonly string[]; cwd: string }> = [];
-  afterEach(async () => { if (server?.listening) { server.close(); await once(server, "close"); } if (directory) await rm(directory, { recursive: true, force: true }); });
+  afterEach(async () => { if (server?.listening) { server.close(); await once(server, "close"); } if (directory) await rm(directory, { recursive: true, force: true }); copiedFiles.length = 0; });
   it("健康检查包含当前插件版本，避免复用旧侧栏进程", async () => {
     const url = await start();
     const health = await request(url, "GET", "/api/health");
@@ -49,20 +46,21 @@ describe("PlanTree Web API", () => {
     const completed = await request(url, "POST", "/api/execution/n2/complete", { expectedVersion: started.body.snapshot.version });
     expect(completed.body).toMatchObject({ done: true, snapshot: { nodes: { n1: { status: "completed" }, n2: { status: "completed" } } } });
   });
-  it("侧栏点击开始执行后写入兼容执行请求", async () => {
+  it("侧栏点击复制后生成 Markdown 并复制文件对象", async () => {
     const url = await start();
-    const result = await request(url, "POST", "/api/execution/request", { planId: "demo-import-wizard-crash", snapshotVersion: 1 });
+    const result = await request(url, "POST", "/api/execution/copy", { planId: "demo-import-wizard-crash", snapshotVersion: 1 });
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ request: { requestId: 1, planId: "demo-import-wizard-crash", snapshotVersion: 1 } });
-    expect(result.body.launch.threadId).toBe("019ff54b-adcb-7982-880f-15db0ce32449");
-    expect(launched.at(-1)?.args).toContain("019ff54b-adcb-7982-880f-15db0ce32449");
+    expect(result.body.copied).toMatchObject({ fileName: "plantree-prompt.md", taskCount: 1 });
+    expect(await readFile(join(directory!, "plantree-prompt.md"), "utf8")).toContain("# 任务执行要求");
+    expect(copiedFiles).toEqual([join(directory!, "plantree-prompt.md")]);
   });
-  it("拒绝用过期的侧栏快照启动 Codex", async () => {
+  it("拒绝用过期的侧栏快照复制提示文件", async () => {
     const url = await start();
-    const result = await request(url, "POST", "/api/execution/request", { planId: "stale", snapshotVersion: 0 });
+    const result = await request(url, "POST", "/api/execution/copy", { planId: "stale", snapshotVersion: 0 });
     expect(result.status).toBe(409);
     expect(result.body.snapshot.id).toBe("demo-import-wizard-crash");
   });
-  async function start() { directory = await mkdtemp(join(tmpdir(), "plantree-api-")); const bindings = new ConversationBindingStore(join(directory, "binding.json")); await bindings.bind("demo-import-wizard-crash", "019ff54b-adcb-7982-880f-15db0ce32449", directory); const bridge = new CodexConversationBridge(async () => "codex-test", async (command, args, options) => { launched.push({ command, args, cwd: options.cwd }); }); const api = createWebApi(new DemoSession(new PersistentPlanStore(join(directory, "plan.json"))), new ExecutionRequestStore(join(directory, "execution-request.json")), bindings, bridge); server = createServer((request, response) => void api.handle(request, response)); server.listen(0, "127.0.0.1"); await once(server, "listening"); const address = server.address(); if (!address || typeof address === "string") throw new Error("未获得端口"); return `http://127.0.0.1:${address.port}`; }
+  const copiedFiles: string[] = [];
+  async function start() { directory = await mkdtemp(join(tmpdir(), "plantree-api-")); const clipboard = new PromptFileClipboard(join(directory, "plantree-prompt.md"), async (filePath) => { copiedFiles.push(filePath); }); const api = createWebApi(new DemoSession(new PersistentPlanStore(join(directory, "plan.json"))), clipboard); server = createServer((request, response) => void api.handle(request, response)); server.listen(0, "127.0.0.1"); await once(server, "listening"); const address = server.address(); if (!address || typeof address === "string") throw new Error("未获得端口"); return `http://127.0.0.1:${address.port}`; }
 });
 async function request(url: string, method: string, path: string, body?: unknown): Promise<{ status: number; body: any }> { const response = await fetch(`${url}${path}`, { method, headers: body === undefined ? undefined : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); return { status: response.status, body: await response.json() }; }

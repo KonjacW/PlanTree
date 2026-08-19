@@ -7,9 +7,6 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { DemoSession } from "../src/application/demo-session.js";
-import { CodexConversationBridge } from "../src/application/codex-conversation-bridge.js";
-import { ConversationBindingStore } from "../src/application/conversation-binding-store.js";
-import { ExecutionRequestStore } from "../src/application/execution-request-store.js";
 import { PersistentPlanStore } from "../src/application/persistent-plan-store.js";
 import { PLANTREE_RUNTIME_VERSION } from "../src/runtime-version.js";
 import { closePlanTreeSidebarForTests, ensurePlanTreeSidebar } from "../src/sidebar-runtime.js";
@@ -39,9 +36,7 @@ describe("PlanTree sidebar runtime", () => {
     directory = await mkdtemp(join(tmpdir(), "plantree-sidebar-runtime-"));
     const url = await ensurePlanTreeSidebar(
       new DemoSession(new PersistentPlanStore(join(directory, "plan.json"))),
-      new ExecutionRequestStore(join(directory, "execution-request.json")),
-      new ConversationBindingStore(join(directory, "binding.json")),
-      new CodexConversationBridge(async () => "codex-test", async () => undefined),
+      undefined,
       staleAddress.port,
     );
 

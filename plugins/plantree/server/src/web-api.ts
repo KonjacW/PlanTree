@@ -1,17 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { DemoSession } from "./application/demo-session.js";
-import { CodexConversationBridge } from "./application/codex-conversation-bridge.js";
-import { ConversationBindingStore } from "./application/conversation-binding-store.js";
-import { ExecutionRequestStore } from "./application/execution-request-store.js";
 import { PlanVersionConflictError } from "./application/persistent-plan-store.js";
+import { PromptFileClipboard } from "./application/prompt-file-clipboard.js";
 import { buildPlannerPrompt } from "./domain/planner-prompt.js";
 import type { TaskTree } from "./domain/task-tree.js";
 import { PLANTREE_RUNTIME_VERSION } from "./runtime-version.js";
 import { toEditCommand } from "./server.js";
 
 export type WebApi = { handle(request: IncomingMessage, response: ServerResponse): Promise<void> };
-export function createWebApi(session = new DemoSession(), executionRequests = new ExecutionRequestStore(), conversationBindings = new ConversationBindingStore(), conversationBridge = new CodexConversationBridge()): WebApi {
+export function createWebApi(session = new DemoSession(), promptClipboard = new PromptFileClipboard()): WebApi {
   return { async handle(request, response) { try { respond(response, 200, await route(request)); } catch (error) { if (error instanceof PlanVersionConflictError) return respond(response, 409, { error: error.message, snapshot: error.snapshot }); const message = error instanceof Error ? error.message : "请求处理失败。"; respond(response, message === "未找到请求的资源。" ? 404 : 400, { error: message }); } } };
   async function route(request: IncomingMessage) {
     const url = request.url ?? "";
@@ -24,18 +22,15 @@ export function createWebApi(session = new DemoSession(), executionRequests = ne
       return { summary: "已生成任务树规划提示词。", plannerPrompt: buildPlannerPrompt(goal) };
     }
     if (url === "/api/execution/chain") return session.compileExecutionChain();
-    if (url === "/api/execution/request") {
+    if (url === "/api/execution/copy") {
       const { snapshot, chain } = await session.compileExecutionChain();
       const requestedPlanId = requireString(input, "planId");
       const requestedVersion = requireNonnegativeInteger(input, "snapshotVersion");
       if (requestedPlanId !== snapshot.id || requestedVersion !== snapshot.version) {
         throw new PlanVersionConflictError(snapshot);
       }
-      const binding = await conversationBindings.read();
-      if (!binding) throw new Error("当前任务树尚未绑定 Codex 对话，请在创建它的对话中重新打开 PlanTree。");
-      const executionRequest = await executionRequests.create(snapshot.id, snapshot.version);
-      const launch = await conversationBridge.launchExecution(executionRequest, binding);
-      return { summary: `已在原 Codex 对话启动新回合，将执行 ${chain.tasks.filter((task) => task.status !== "completed").length} 个剩余任务。`, request: executionRequest, launch, snapshot, chain };
+      const copied = await promptClipboard.copy(snapshot, chain);
+      return { summary: `已将 ${copied.fileName} 文件复制到剪贴板，其中包含 ${copied.taskCount} 个剩余任务。`, copied, snapshot, chain };
     }
     const expectedVersion = requireExpectedVersion(input);
     if (url === "/api/plan/import") return session.importTaskTree(requireTree(input), expectedVersion);

@@ -51,7 +51,7 @@ npm --prefix plugins/plantree/server run build
 2. 完全退出并重新打开 Codex，使其重新读取 PATH。
 3. 重新构建并安装插件；不要在仓库中提交个人机器的绝对路径。
 
-安装成功后，调用 `render_plan_tree` 会启动并返回侧栏任务树，同时记录创建该树的 Codex `threadId`。用户点击一次“开始自动执行”后，本地桥接会用 `codex exec resume` 在原对话启动新回合，并按顺序处理完整剩余队列，无需保持旧回合等待、复制提示词或逐项确认。
+安装成功后，调用 `render_plan_tree` 会启动并返回侧栏任务树。用户点击“复制执行文件”后，服务端生成 `data/plantree-prompt.md`，并把该文件作为 Windows 剪贴板文件对象复制；用户只需在目标 Codex 对话粘贴并发送。文件包含完整剩余队列、子任务要求和验收协议，不需要逐项复制。
 
 节点内容、执行链和快捷键帮助共用任务树窗口内的单层工作区，按需替换“当前节点详情”区域，打开其中一项会收起另一项，不增加新的页面层级。只有裁剪节点和放弃未保存修改仍使用带遮罩的确认弹窗。
 
@@ -69,7 +69,7 @@ codex plugin marketplace list
 codex plugin list
 ```
 
-拉取新版代码并重新构建后，再运行 `codex plugin add plantree@plantree-local` 刷新安装。完全重启 Codex，并在新任务中测试新的 MCP 工具和侧栏执行请求。
+拉取新版代码并重新构建后，再运行 `codex plugin add plantree@plantree-local` 刷新安装。完全重启 Codex，并在新任务中测试新的 MCP 工具和侧栏复制按钮。
 
 ## 4. 常用验证
 
@@ -103,6 +103,7 @@ openspec validate graph-interactive-plantree --strict
 - `plugins/plantree/data/plantree-plan.example.json`：随仓库提交的示例。
 - `plugins/plantree/data/kylin-memory-task-tree.example.json`：总目标到人工调树、链式执行的回归输入。
 - `plugins/plantree/data/plantree-plan.json`：本机运行状态，已被 Git 忽略。
+- `plugins/plantree/data/plantree-prompt.md`：点击复制时原子生成的临时交接文件，已被 Git 忽略。
 - `plugins/plantree/server/dist`、`plugins/plantree/ui/dist`：可重新构建的产物，已被 Git 忽略。
 
 不要用示例文件无条件覆盖其他人的运行状态，也不要提交自己的 `plantree-plan.json`。
@@ -125,4 +126,4 @@ openspec validate graph-interactive-plantree --strict
 - [故障排查](docs/troubleshooting.md)
 - [后端交接清单](docs/handoff-checklist.md)
 
-当前产品决策永久放弃内嵌任务树；验收重点是侧栏一次点击后在创建任务树的原 Codex 对话启动新回合并接管完整执行链。
+当前产品决策永久放弃内嵌任务树和内部对话传输；验收重点是侧栏一次点击后剪贴板包含可粘贴的 `plantree-prompt.md` 文件对象。
